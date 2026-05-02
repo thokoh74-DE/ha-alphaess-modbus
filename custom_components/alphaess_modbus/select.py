@@ -54,6 +54,10 @@ class AlphaESSSelect(RestoreEntity, SelectEntity):
             self._coordinator.selects[self._reg.key] = self._current_option
 
     @property
+    def available(self) -> bool:
+        return self._coordinator.last_update_success
+
+    @property
     def current_option(self) -> str | None:
         # For register-backed selects, prefer the live coordinator value so the
         # dropdown reflects the actual inverter state rather than the last HA state.

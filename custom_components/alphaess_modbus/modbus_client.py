@@ -4,6 +4,7 @@ import asyncio
 import inspect
 import logging
 import struct
+import time
 from typing import Any
 
 from pymodbus.client import AsyncModbusTcpClient
@@ -26,24 +27,31 @@ class AlphaESSModbusClient:
         self._slave_id = slave_id
         self._client: AsyncModbusTcpClient | None = None
         self._lock = asyncio.Lock()
+        self._connect_lock = asyncio.Lock()
+        self._consecutive_failures: int = 0
+        self._skip_until: float = 0.0
 
     @property
     def connected(self) -> bool:
         return self._client is not None and self._client.connected
 
     async def connect(self) -> None:
-        """Connect with retries — inverter may refuse immediately after a prior close."""
-        self._client = AsyncModbusTcpClient(self._host, port=self._port, timeout=5)
-        for attempt in range(_CONNECT_RETRIES):
-            await self._client.connect()
-            if self._client.connected:
-                return
-            if attempt < _CONNECT_RETRIES - 1:
-                _LOGGER.debug(
-                    "Connect attempt %d/%d failed, retrying in %.0fs",
-                    attempt + 1, _CONNECT_RETRIES, _CONNECT_RETRY_DELAY,
-                )
-                await asyncio.sleep(_CONNECT_RETRY_DELAY)
+        """Connect with retries — inverter may refuse immediately after a prior close.
+
+        Guarded by _connect_lock so concurrent callers coalesce into one attempt.
+        """
+        async with self._connect_lock:
+            self._client = AsyncModbusTcpClient(self._host, port=self._port, timeout=5)
+            for attempt in range(_CONNECT_RETRIES):
+                await self._client.connect()
+                if self._client.connected:
+                    return
+                if attempt < _CONNECT_RETRIES - 1:
+                    _LOGGER.debug(
+                        "Connect attempt %d/%d failed, retrying in %.0fs",
+                        attempt + 1, _CONNECT_RETRIES, _CONNECT_RETRY_DELAY,
+                    )
+                    await asyncio.sleep(_CONNECT_RETRY_DELAY)
 
     async def close(self) -> None:
         if self._client:
@@ -52,7 +60,20 @@ class AlphaESSModbusClient:
 
     async def _ensure_connected(self) -> None:
         if not self.connected:
+            # Backoff: after 3 consecutive failures hold off reconnects for 10 s so
+            # one disconnected cycle doesn't fire dozens of blocking retry loops.
+            if time.monotonic() < self._skip_until:
+                raise ModbusException("Reconnect backoff active")
             await self.connect()
+            if self.connected:
+                self._consecutive_failures = 0
+            else:
+                self._consecutive_failures += 1
+                if self._consecutive_failures >= 3:
+                    self._skip_until = time.monotonic() + 10.0
+                    _LOGGER.debug(
+                        "3 consecutive connect failures — backing off for 10 s"
+                    )
         if not self.connected:
             raise ModbusException("Not connected")
 

@@ -114,6 +114,10 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             await asyncio.gather(*self._pending_tasks, return_exceptions=True)
 
     @property
+    def available(self) -> bool:
+        return self._coordinator.last_update_success
+
+    @property
     def is_on(self) -> bool:
         return self._is_on
 

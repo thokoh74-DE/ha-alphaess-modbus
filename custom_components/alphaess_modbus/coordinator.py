@@ -139,9 +139,14 @@ class AlphaESSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         string_regs = [r for r in due if r.data_type == "string"]
         numeric_regs = [r for r in due if r.data_type != "string"]
         errors: list[str] = []
+        errors_this_cycle = 0
 
         # Block reads for numeric registers
         for g_start, g_count, g_regs in _group_registers(numeric_regs):
+            if errors_this_cycle > 5:
+                raise UpdateFailed(
+                    f"Too many read errors this cycle ({errors_this_cycle}), aborting"
+                )
             try:
                 raw = await self.client.read_block(g_start, g_count)
                 for reg in g_regs:
@@ -151,20 +156,27 @@ class AlphaESSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         self._last_polled[reg.key] = now
                     except Exception as decode_err:
                         errors.append(f"{reg.key}: decode error: {decode_err}")
+                        errors_this_cycle += 1
                         _LOGGER.debug("Decode error for %s: %s", reg.key, decode_err)
             except ModbusException as err:
+                errors_this_cycle += 1
                 for reg in g_regs:
                     errors.append(f"{reg.key}: {err}")
                 _LOGGER.debug("Block read error at %#06x+%d: %s", g_start, g_count, err)
 
         # Individual reads for string registers
         for reg in string_regs:
+            if errors_this_cycle > 5:
+                raise UpdateFailed(
+                    f"Too many read errors this cycle ({errors_this_cycle}), aborting"
+                )
             try:
                 data[reg.key] = await self.client.read_register(
                     reg.address, reg.data_type, reg.count
                 )
                 self._last_polled[reg.key] = now
             except ModbusException as err:
+                errors_this_cycle += 1
                 errors.append(f"{reg.key}: {err}")
                 _LOGGER.debug("Modbus read error for %s: %s", reg.key, err)
 

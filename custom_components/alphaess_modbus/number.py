@@ -87,6 +87,10 @@ class AlphaESSNumber(RestoreEntity, NumberEntity):
         self._coordinator.numbers[self._reg.key] = self._value
 
     @property
+    def available(self) -> bool:
+        return self._coordinator.last_update_success
+
+    @property
     def native_value(self) -> float | None:
         # For register-backed numbers, prefer the live coordinator value so the
         # slider reflects what the inverter actually has rather than the last
