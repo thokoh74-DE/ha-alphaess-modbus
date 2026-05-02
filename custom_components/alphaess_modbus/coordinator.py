@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from datetime import timedelta
@@ -22,6 +21,9 @@ COORDINATOR_INTERVAL = timedelta(seconds=2)
 # Fast SOC sampling rate (seconds) used while a SOC watcher is active.
 _SOC_FAST_INTERVAL = 2
 _SOC_BATTERY_KEY = "soc_battery"
+
+# Per-register scan intervals — used for stale-entry expiry.
+_SCAN_INTERVAL_MAP: dict[str, float] = {r.key: r.scan_interval for r in SENSOR_REGISTERS}
 
 
 def _reg_width(reg: ModbusSensorDef) -> int:
@@ -169,12 +171,22 @@ class AlphaESSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if errors and not data:
             raise UpdateFailed(f"All reads failed: {errors}")
 
+        # Expire entries not successfully read for more than 5x their scan interval.
+        # Sensors whose register permanently fails will report unknown instead of
+        # keeping the last good value indefinitely.
+        for key in list(data.keys()):
+            last = self._last_polled.get(key, 0.0)
+            if last == 0.0:
+                continue
+            si = _SCAN_INTERVAL_MAP.get(key)
+            if si and (now - last) > 5 * si:
+                del data[key]
+
         return data
 
     async def async_write_dispatch(self, values: list[int]) -> None:
         from .const import DISPATCH_START_ADDR
         await self.client.write_registers(DISPATCH_START_ADDR, values)
-        await self.async_request_refresh()
 
     async def async_reset_dispatch(self) -> None:
         await self.async_write_dispatch([
@@ -188,27 +200,19 @@ class AlphaESSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_write_register(self, address: int, value: int) -> None:
         await self.client.write_register(address, value)
-        await self.async_request_refresh()
 
     async def async_write_registers(self, address: int, values: list[int]) -> None:
         await self.client.write_registers(address, values)
-        await self.async_request_refresh()
 
     async def async_sync_datetime(self) -> None:
         import datetime
         now = datetime.datetime.now()
         yy = now.year - 2000
-        mm = now.month
-        dd = now.day
-        hh = now.hour
-        mi = now.minute
-        ss = now.second
-        yymm = int(f"{yy:02x}{mm:02x}", 16)
-        ddhh = int(f"{dd:02x}{hh:02x}", 16)
-        mmss = int(f"{mi:02x}{ss:02x}", 16)
-        await self.client.write_register(0x0740, yymm)
-        await asyncio.sleep(0.1)
-        await self.client.write_register(0x0741, ddhh)
-        await asyncio.sleep(0.1)
-        await self.client.write_register(0x0742, mmss)
+        # BCD-encoded uint16: each byte holds a decimal field packed as hex digits,
+        # e.g. year=26, month=5 -> 0x2605. Confirmed correct on this inverter;
+        # raw binary encoding (year * 256 + month) produces wrong values.
+        yymm = int(f"{yy:02x}{now.month:02x}", 16)
+        ddhh = int(f"{now.day:02x}{now.hour:02x}", 16)
+        mmss = int(f"{now.minute:02x}{now.second:02x}", 16)
+        await self.client.write_registers(0x0740, [yymm, ddhh, mmss])
         await self.async_request_refresh()
