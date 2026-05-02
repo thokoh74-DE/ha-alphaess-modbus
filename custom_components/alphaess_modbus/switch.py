@@ -108,11 +108,19 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         self._timer_cancel: asyncio.TimerHandle | None = None
         self._duration_cancel: asyncio.TimerHandle | None = None
         self._soc_unsub: Any | None = None
+        self._pending_tasks: set[asyncio.Task] = set()
 
     async def async_added_to_hass(self) -> None:
         state = await self.async_get_last_state()
         if state and state.state == "on":
             self._is_on = False  # Don't auto-resume dispatch on restart
+
+    async def async_will_remove_from_hass(self) -> None:
+        self._cancel_timer()
+        for task in list(self._pending_tasks):
+            task.cancel()
+        if self._pending_tasks:
+            await asyncio.gather(*self._pending_tasks, return_exceptions=True)
 
     @property
     def is_on(self) -> bool:
@@ -242,7 +250,9 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             await self._async_turn_off_silent()
 
         def _callback():
-            asyncio.ensure_future(_turn_off(), loop=loop)
+            task = self.hass.async_create_task(_turn_off(), name=f"alphaess_{self.switch_key}_duration_off")
+            self._pending_tasks.add(task)
+            task.add_done_callback(self._pending_tasks.discard)
 
         self._duration_cancel = loop.call_later(duration_seconds, _callback)
 
@@ -254,7 +264,9 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             await self._async_turn_off_silent()
 
         def _callback():
-            asyncio.ensure_future(_turn_off(), loop=loop)
+            task = self.hass.async_create_task(_turn_off(), name=f"alphaess_{self.switch_key}_auto_off")
+            self._pending_tasks.add(task)
+            task.add_done_callback(self._pending_tasks.discard)
 
         self._timer_cancel = loop.call_later(duration_seconds, _callback)
 
@@ -306,7 +318,9 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             self._soc_unsub = None
             if unsub:
                 unsub()
-            asyncio.ensure_future(self._async_turn_off_silent(), loop=self.hass.loop)
+            task = self.hass.async_create_task(self._async_turn_off_silent(), name=f"alphaess_{self.switch_key}_soc_off")
+            self._pending_tasks.add(task)
+            task.add_done_callback(self._pending_tasks.discard)
 
         self._soc_unsub = self._coordinator.async_add_listener(_check)
 
@@ -358,7 +372,9 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
                 await self._async_turn_off_silent()
 
         def _callback():
-            asyncio.ensure_future(_refresh(), loop=loop)
+            task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_hold_refresh")
+            self._pending_tasks.add(task)
+            task.add_done_callback(self._pending_tasks.discard)
 
         self._timer_cancel = loop.call_later(50, _callback)
 
@@ -391,7 +407,9 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             await self._start_force_discharging()
 
         def _callback():
-            asyncio.ensure_future(_refresh(), loop=loop)
+            task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_discharge_refresh")
+            self._pending_tasks.add(task)
+            task.add_done_callback(self._pending_tasks.discard)
 
         self._timer_cancel = loop.call_later(50, _callback)
 
@@ -424,7 +442,9 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             await self._start_force_export()
 
         def _callback():
-            asyncio.ensure_future(_refresh(), loop=loop)
+            task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_export_refresh")
+            self._pending_tasks.add(task)
+            task.add_done_callback(self._pending_tasks.discard)
 
         self._timer_cancel = loop.call_later(50, _callback)
 
@@ -489,7 +509,9 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             await self._start_excess_export()
 
         def _callback():
-            asyncio.ensure_future(_refresh(), loop=loop)
+            task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_excess_export_refresh")
+            self._pending_tasks.add(task)
+            task.add_done_callback(self._pending_tasks.discard)
 
         self._timer_cancel = loop.call_later(240, _callback)
 
@@ -564,7 +586,9 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             await self._start_force_import()
 
         def _callback():
-            asyncio.ensure_future(_refresh(), loop=loop)
+            task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_import_refresh")
+            self._pending_tasks.add(task)
+            task.add_done_callback(self._pending_tasks.discard)
 
         self._timer_cancel = loop.call_later(25, _callback)
 
@@ -603,6 +627,8 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             await self._start_smart_export()
 
         def _callback():
-            asyncio.ensure_future(_refresh(), loop=loop)
+            task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_smart_refresh")
+            self._pending_tasks.add(task)
+            task.add_done_callback(self._pending_tasks.discard)
 
         self._timer_cancel = loop.call_later(30, _callback)

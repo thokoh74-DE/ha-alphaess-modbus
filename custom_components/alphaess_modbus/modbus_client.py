@@ -15,8 +15,8 @@ _LOGGER = logging.getLogger(__name__)
 _sig = inspect.signature(AsyncModbusTcpClient.read_holding_registers).parameters
 _SLAVE_KWARG = "device_id" if "device_id" in _sig else "slave"
 
-_CONNECT_RETRIES = 5
-_CONNECT_RETRY_DELAY = 3.0  # seconds between retries
+_CONNECT_RETRIES = 2
+_CONNECT_RETRY_DELAY = 1.0  # seconds between retries
 
 
 class AlphaESSModbusClient:
