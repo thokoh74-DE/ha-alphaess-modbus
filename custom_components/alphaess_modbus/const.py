@@ -59,10 +59,11 @@ class ModbusNumberDef:
 class ModbusSelectDef:
     key: str
     name: str
-    address: int
+    address: int | None
     options: list[str] = field(default_factory=list)
     values: list[int] = field(default_factory=list)
     icon: str | None = None
+    sensor_key: str | None = None  # coordinator.data key holding the raw value for this select
 
 
 @dataclass
@@ -600,6 +601,7 @@ SELECT_REGISTERS: list[ModbusSelectDef] = [
         ],
         values=[0, 1, 2, 3],
         icon="mdi:battery-charging",
+        sensor_key="charging_time_period_control",
     ),
     ModbusSelectDef(
         "dispatch_mode",
@@ -617,6 +619,7 @@ SELECT_REGISTERS: list[ModbusSelectDef] = [
         ],
         values=[1, 2, 3, 4, 5, 6, 7, 19],
         icon="mdi:battery-arrow-up-outline",
+        sensor_key="dispatch_mode",
     ),
     ModbusSelectDef(
         "inverter_ac_limit",

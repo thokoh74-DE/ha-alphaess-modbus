@@ -56,6 +56,20 @@ class AlphaESSModbusClient:
         if not self.connected:
             raise ModbusException("Not connected")
 
+    async def read_block(self, start: int, count: int) -> list[int]:
+        """Read `count` consecutive holding registers starting at `start`.
+
+        Returns a list of raw uint16 values; decoding is done by the caller.
+        """
+        async with self._lock:
+            await self._ensure_connected()
+            result = await self._client.read_holding_registers(
+                start, count=count, **{_SLAVE_KWARG: self._slave_id}
+            )
+            if result.isError():
+                raise ModbusException(f"Error reading block {start:#06x}+{count}: {result}")
+            return list(result.registers)
+
     async def read_register(self, address: int, data_type: str, count: int = 1) -> Any:
         async with self._lock:
             return await self._read(address, data_type, count)

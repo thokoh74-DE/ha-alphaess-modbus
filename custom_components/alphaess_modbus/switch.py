@@ -76,15 +76,6 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-def _get_number(hass: HomeAssistant, entry_id: str, key: str, default: float) -> float:
-    entity_id = f"number.alphaess_inverter_{key}"
-    state = hass.states.get(entity_id)
-    if state and state.state not in ("unknown", "unavailable"):
-        try:
-            return float(state.state)
-        except ValueError:
-            pass
-    return default
 
 
 class AlphaESSSwitch(RestoreEntity, SwitchEntity):
@@ -208,9 +199,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             switches = self.hass.data[DOMAIN].get(f"{self._entry.entry_id}_switches", {})
             pause_sw = switches.get(pause_key)
             if pause_sw and pause_sw.is_on:
-                pause_sw._is_on = False
-                pause_sw._cancel_timer()
-                pause_sw.async_write_ha_state()
+                await pause_sw.async_force_off()
 
     def _cancel_timer(self) -> None:
         if self._timer_cancel:
@@ -271,30 +260,47 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         self._timer_cancel = loop.call_later(duration_seconds, _callback)
 
     def _num(self, key: str, default: float) -> float:
-        return _get_number(self.hass, self._entry.entry_id, key, default)
+        v = self._coordinator.get_number(key)
+        return v if v is not None else default
 
     def _get_dispatch_mode(self) -> int:
-        """Read the dispatch mode value from the select entity option string e.g. 'Load Following (3)'."""
-        entity_id = "select.alphaess_inverter_dispatch_mode"
-        state = self.hass.states.get(entity_id)
-        if state and state.state not in ("unknown", "unavailable"):
+        """Read the dispatch mode int from the coordinator select cache."""
+        option = self._coordinator.get_select("dispatch_mode")
+        if option:
             try:
-                return int(state.state.split("(")[-1].split(")")[0])
+                return int(option.split("(")[-1].split(")")[0])
             except (ValueError, IndexError):
                 pass
         return DISPATCH_MODE_SOC_CONTROL
 
+    async def async_force_off(self) -> None:
+        """Unconditionally mark this switch off and cancel its timers.
+
+        Used by other switches/buttons that need to clear state without
+        triggering a full dispatch reset (which is the caller's responsibility).
+        """
+        self._is_on = False
+        self._cancel_timer()
+        self.async_write_ha_state()
+
+    async def async_force_on(self) -> None:
+        """Unconditionally mark this switch on without starting any dispatch."""
+        self._is_on = True
+        self.async_write_ha_state()
+
     def _start_soc_watcher(self, direction: str, param_key: str, default: float) -> None:
         """Watch soc_battery via coordinator and stop this switch when the cutoff is reached.
 
-        Fires on every coordinator update where soc_battery is present (~10 s cadence).
-        Reads the cutoff number entity dynamically so mid-session changes take effect.
+        Activates fast SOC sampling (2 s) while the watcher is alive.
         direction='below': stop when soc <= cutoff  (discharge/export)
         direction='above': stop when soc >= cutoff  (charge)
         """
         if self._soc_unsub:
+            # Already watching — unsubscribe first (decrements fast-SOC refcount).
             self._soc_unsub()
             self._soc_unsub = None
+
+        self._coordinator.set_fast_soc(True)
 
         def _check() -> None:
             if not self._is_on:
@@ -317,12 +323,18 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             unsub = self._soc_unsub
             self._soc_unsub = None
             if unsub:
-                unsub()
+                unsub()  # decrements fast-SOC refcount via _combined_unsub
             task = self.hass.async_create_task(self._async_turn_off_silent(), name=f"alphaess_{self.switch_key}_soc_off")
             self._pending_tasks.add(task)
             task.add_done_callback(self._pending_tasks.discard)
 
-        self._soc_unsub = self._coordinator.async_add_listener(_check)
+        raw_unsub = self._coordinator.async_add_listener(_check)
+
+        def _combined_unsub() -> None:
+            raw_unsub()
+            self._coordinator.set_fast_soc(False)
+
+        self._soc_unsub = _combined_unsub
 
     # ------------------------------------------------------------------
     # Force Charging
