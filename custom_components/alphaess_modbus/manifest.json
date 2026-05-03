@@ -1,11 +1,11 @@
 {
   "domain": "alphaess_modbus",
   "name": "AlphaESS Modbus TCP",
-  "version": "1.9.4",
+  "codeowners": ["@senalse"],
+  "config_flow": true,
   "documentation": "https://projects.hillviewlodge.ie/alphaess/",
+  "iot_class": "local_polling",
   "issue_tracker": "https://github.com/senalse/ha-alphaess-modbus/issues",
   "requirements": ["pymodbus>=3.7.4"],
-  "config_flow": true,
-  "iot_class": "local_polling",
-  "codeowners": ["@senalse"]
+  "version": "1.9.4"
 }

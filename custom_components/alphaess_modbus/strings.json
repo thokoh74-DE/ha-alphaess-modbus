@@ -21,168 +21,129 @@
   "entity": {
     "binary_sensor": {
       "excess_export_pause": {
-        "name": "Excess Export Pause",
-        "description": "On when Excess Export has automatically paused because the house is drawing from the grid. Clears automatically once PV production exceeds house load again."
+        "name": "Excess Export Pause"
       }
     },
     "switch": {
       "force_charging": {
-        "name": "Force Charging",
-        "description": "Forces the battery to charge from the grid at the configured power. Stops after the set duration or when SoC reaches the cutoff. Turns off any other active dispatch switch."
+        "name": "Force Charging"
       },
       "force_charging_hold": {
-        "name": "Force Charging Hold",
-        "description": "When enabled, Force Charging will not return to self-consumption mode when the duration expires or the SoC cutoff is reached. Instead a neutral hold dispatch keeps the inverter in dispatch mode to prevent the battery discharging. Turn Force Charging off to return to normal operation."
+        "name": "Force Charging Hold"
       },
       "force_discharging": {
-        "name": "Force Discharging",
-        "description": "Forces the battery to discharge at the configured power. Stops after the set duration or when SoC falls to the cutoff. Turns off any other active dispatch switch."
+        "name": "Force Discharging"
       },
       "force_export": {
-        "name": "Force Export",
-        "description": "Forces the battery to discharge to the grid at the configured power. Stops after the set duration or when SoC falls to the cutoff. Turns off any other active dispatch switch."
+        "name": "Force Export"
       },
       "dispatch": {
-        "name": "Dispatch",
-        "description": "Sends a manual dispatch command using the configured power, mode, SoC target and duration. Turns off any other active dispatch switch."
+        "name": "Dispatch"
       },
       "excess_export": {
-        "name": "Excess Export",
-        "description": "Exports excess PV to the grid. Automatically pauses when the house starts drawing from the grid and resumes once PV exceeds house load again. Turns off any other active dispatch switch."
+        "name": "Excess Export"
       },
       "force_import": {
-        "name": "Force Import",
-        "description": "Imports from the grid at the configured power, dynamically adjusted for live house load and PV so total grid draw stays at the target. Recalculates every 25 seconds. Stops after the set duration or when SoC reaches the cutoff. Turns off any other active dispatch switch."
+        "name": "Force Import"
       },
       "force_import_hold": {
-        "name": "Force Import Hold",
-        "description": "When enabled, Force Import will not return to self-consumption mode when the duration expires or the SoC cutoff is reached. The dispatch continues refreshing to hold the battery at the target SoC and prevent discharge. Turn Force Import off to return to normal operation."
+        "name": "Force Import Hold"
       },
       "force_import_pause": {
-        "name": "Force Import Pause",
-        "description": "Temporarily pauses Force Import without cancelling it. Turn off to immediately resume importing."
+        "name": "Force Import Pause"
       },
       "smart_export": {
-        "name": "Smart Export",
-        "description": "Exports up to Max Export Power to the grid, dynamically accounting for live house load and PV production. Recalculates every 30 seconds. Turns off any other active dispatch switch."
+        "name": "Smart Export"
       }
     },
     "number": {
       "charging_cutoff_soc": {
-        "name": "Charging Cutoff SoC",
-        "description": "SoC at which the inverter's scheduled grid charging (time period control) stops."
+        "name": "Charging Cutoff SoC"
       },
       "discharging_cutoff_soc": {
-        "name": "Discharging Cutoff SoC",
-        "description": "Minimum SoC at which the inverter's scheduled battery discharge stops."
+        "name": "Discharging Cutoff SoC"
       },
       "max_feed_to_grid": {
-        "name": "Max Feed to Grid",
-        "description": "Maximum percentage of inverter capacity that can be exported to the grid."
+        "name": "Max Feed to Grid"
       },
       "force_charging_power": {
-        "name": "Force Charging Power",
-        "description": "Charging rate from the grid when Force Charging is active."
+        "name": "Force Charging Power"
       },
       "force_charging_cutoff_soc": {
-        "name": "Force Charging Cutoff SoC",
-        "description": "Force Charging stops when the battery reaches this SoC."
+        "name": "Force Charging Cutoff SoC"
       },
       "force_charging_duration": {
-        "name": "Force Charging Duration",
-        "description": "How long Force Charging runs before switching off automatically."
+        "name": "Force Charging Duration"
       },
       "force_discharging_power": {
-        "name": "Force Discharging Power",
-        "description": "Discharge rate when Force Discharging is active."
+        "name": "Force Discharging Power"
       },
       "force_discharging_cutoff_soc": {
-        "name": "Force Discharging Cutoff SoC",
-        "description": "Force Discharging stops when the battery falls to this SoC."
+        "name": "Force Discharging Cutoff SoC"
       },
       "force_discharging_duration": {
-        "name": "Force Discharging Duration",
-        "description": "How long Force Discharging runs before switching off automatically."
+        "name": "Force Discharging Duration"
       },
       "force_export_power": {
-        "name": "Force Export Power",
-        "description": "Grid export rate when Force Export is active."
+        "name": "Force Export Power"
       },
       "force_export_cutoff_soc": {
-        "name": "Force Export Cutoff SoC",
-        "description": "Force Export stops when the battery falls to this SoC. Also used as the SoC floor by Smart Export."
+        "name": "Force Export Cutoff SoC"
       },
       "force_export_duration": {
-        "name": "Force Export Duration",
-        "description": "How long Force Export runs before switching off automatically."
+        "name": "Force Export Duration"
       },
       "dispatch_power": {
-        "name": "Dispatch Power",
-        "description": "Power level for the Dispatch switch. Positive = discharge / export, negative = charge / import."
+        "name": "Dispatch Power"
       },
       "dispatch_cutoff_soc": {
-        "name": "Dispatch Cutoff SoC",
-        "description": "Dispatch stops when the battery reaches this SoC (SoC Control mode only)."
+        "name": "Dispatch Cutoff SoC"
       },
       "dispatch_duration": {
-        "name": "Dispatch Duration",
-        "description": "How long the Dispatch switch runs before switching off automatically."
+        "name": "Dispatch Duration"
       },
       "force_import_power": {
-        "name": "Force Import Power",
-        "description": "Target total grid import rate when Force Import is active. Actual battery charge rate adjusts dynamically based on live house load and PV."
+        "name": "Force Import Power"
       },
       "force_import_cutoff_soc": {
-        "name": "Force Import Cutoff SoC",
-        "description": "Force Import stops when the battery reaches this SoC."
+        "name": "Force Import Cutoff SoC"
       },
       "force_import_duration": {
-        "name": "Force Import Duration",
-        "description": "How long Force Import runs before switching off automatically."
+        "name": "Force Import Duration"
       },
       "max_export_power": {
-        "name": "Max Export Power",
-        "description": "Maximum grid export rate for the Smart Export switch."
+        "name": "Max Export Power"
       }
     },
     "select": {
       "charging_discharging_settings": {
-        "name": "Charging / Discharging Settings",
-        "description": "Enables or disables the inverter's built-in scheduled grid charging and battery discharge time windows."
+        "name": "Charging / Discharging Settings"
       },
       "dispatch_mode": {
-        "name": "Dispatch Mode",
-        "description": "Algorithm the inverter uses while a Dispatch command is active. SoC Control (2) is used by all dispatch switches in this integration."
+        "name": "Dispatch Mode"
       },
       "inverter_ac_limit": {
-        "name": "Inverter AC Limit",
-        "description": "Your inverter's maximum AC output rating. Used by Excess Export to cap dispatch power and avoid overloading the inverter."
+        "name": "Inverter AC Limit"
       }
     },
     "button": {
       "dispatch_reset": {
-        "name": "Dispatch Reset",
-        "description": "Immediately stops any active dispatch command and returns the inverter to normal operation."
+        "name": "Dispatch Reset"
       },
       "synchronise_date_time": {
-        "name": "Synchronise Date & Time",
-        "description": "Writes the current Home Assistant date and time to the inverter's internal clock."
+        "name": "Synchronise Date & Time"
       },
       "sync_dispatch_state": {
-        "name": "Sync Dispatch State",
-        "description": "Reconciles HA switch states with the inverter. If dispatch is running but no switch shows on (e.g. after an integration reload), marks the Dispatch switch as on. If no dispatch is running but a switch shows on, clears it."
+        "name": "Sync Dispatch State"
       },
       "restart_pcs": {
-        "name": "Restart PCS",
-        "description": "Restarts the Power Conversion System (inverter) software. Use for remote troubleshooting when the inverter is behaving unexpectedly."
+        "name": "Restart PCS"
       },
       "restart_ems": {
-        "name": "Restart EMS",
-        "description": "Restarts the Energy Management System software. Use for remote troubleshooting when scheduling or dispatch behaviour is incorrect."
+        "name": "Restart EMS"
       },
       "reset_energy_totals": {
-        "name": "Reset Energy Totals",
-        "description": "WARNING: Clears all lifetime energy counters stored on the inverter. This cannot be undone. Only use this if you have intentionally replaced the inverter or need to zero out the totals."
+        "name": "Reset Energy Totals"
       }
     }
   }
