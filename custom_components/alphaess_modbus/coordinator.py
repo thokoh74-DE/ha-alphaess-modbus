@@ -83,6 +83,8 @@ def _decode_block(reg: ModbusSensorDef, raw: list[int], offset: int) -> Any:
     value = (v + reg.offset) * reg.scale
     if reg.precision is not None:
         value = round(value, reg.precision)
+        if reg.precision == 0:
+            value = int(value)
     return value
 
 
