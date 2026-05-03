@@ -193,8 +193,8 @@ views:
             entities:
               - entity: switch.alphaess_inverter_excess_export
                 name: Enable
-              - entity: switch.alphaess_inverter_excess_export_pause
-                name: Pause
+              - entity: binary_sensor.alphaess_inverter_excess_export_pause
+                name: Paused
               - type: section
               - entity: select.alphaess_inverter_inverter_ac_limit
                 name: Inverter AC Limit

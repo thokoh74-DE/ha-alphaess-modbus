@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 DOMAIN = "alphaess_modbus"
 DEFAULT_PORT = 502
 DEFAULT_SLAVE = 85
-PLATFORMS = ["sensor", "number", "select", "switch", "button", "time"]
+PLATFORMS = ["binary_sensor", "sensor", "number", "select", "switch", "button", "time"]
 
 # ---------------------------------------------------------------------------
 # Register definition dataclasses

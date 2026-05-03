@@ -19,6 +19,12 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "excess_export_pause": {
+        "name": "Excess Export Pause",
+        "description": "On when Excess Export has automatically paused because the house is drawing from the grid. Clears automatically once PV production exceeds house load again."
+      }
+    },
     "switch": {
       "force_charging": {
         "name": "Force Charging",
@@ -42,11 +48,7 @@
       },
       "excess_export": {
         "name": "Excess Export",
-        "description": "Dynamically exports excess PV and battery power to keep net grid flow near zero. Recalculates every 4 minutes. Turns off any other active dispatch switch."
-      },
-      "excess_export_pause": {
-        "name": "Excess Export Pause",
-        "description": "Temporarily pauses Excess Export without cancelling it. Turn off to immediately resume exporting."
+        "description": "Exports excess PV to the grid. Automatically pauses when the house starts drawing from the grid and resumes once PV exceeds house load again. Turns off any other active dispatch switch."
       },
       "force_import": {
         "name": "Force Import",

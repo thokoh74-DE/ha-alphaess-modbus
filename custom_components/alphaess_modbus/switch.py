@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
@@ -57,7 +58,6 @@ SWITCH_DEFS = [
     {"key": "force_import_pause",  "name": "Force Import Pause",   "icon": "mdi:pause-circle"},
     {"key": "dispatch",            "name": "Dispatch",             "icon": "mdi:button-pointer"},
     {"key": "excess_export",       "name": "Excess Export",        "icon": "mdi:solar-power"},
-    {"key": "excess_export_pause", "name": "Excess Export Pause",  "icon": "mdi:pause-circle"},
     {"key": "smart_export",        "name": "Smart Export",         "icon": "mdi:transmission-tower-export"},
 ]
 
@@ -100,6 +100,11 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         self._duration_cancel: asyncio.TimerHandle | None = None
         self._soc_unsub: Any | None = None
         self._pending_tasks: set[asyncio.Task] = set()
+        # Excess export auto-pause watcher state
+        self._ee_listener_unsub: Any | None = None
+        self._ee_last_pause_time: float = 0.0
+        self._ee_last_resume_time: float = 0.0
+        self._ee_work_mode_1_since: float | None = None
 
     async def async_added_to_hass(self) -> None:
         state = await self.async_get_last_state()
@@ -125,7 +130,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         return self._is_on
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        if self.switch_key in ("excess_export_pause", "force_import_pause"):
+        if self.switch_key == "force_import_pause":
             await self._handle_pause_turn_on()
             return
         if self.switch_key in _HOLD_SWITCHES:
@@ -180,7 +185,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        if self.switch_key in ("excess_export_pause", "force_import_pause"):
+        if self.switch_key == "force_import_pause":
             await self._handle_pause_turn_off()
             return
         if self.switch_key in _HOLD_SWITCHES:
@@ -196,15 +201,11 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         if self.switch_key in _HOLD_SWITCHES:
             return
         await self._coordinator.async_reset_dispatch()
-        # When a switch with a paired pause stops, also clear the pause switch
-        pause_key = None
         if self.switch_key == "excess_export":
-            pause_key = "excess_export_pause"
+            self._coordinator.ee_paused = False
         elif self.switch_key == "force_import":
-            pause_key = "force_import_pause"
-        if pause_key:
             switches = self.hass.data[DOMAIN].get(f"{self._entry.entry_id}_switches", {})
-            pause_sw = switches.get(pause_key)
+            pause_sw = switches.get("force_import_pause")
             if pause_sw and pause_sw.is_on:
                 await pause_sw.async_force_off()
 
@@ -218,6 +219,9 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         if self._soc_unsub:
             self._soc_unsub()
             self._soc_unsub = None
+        if self._ee_listener_unsub:
+            self._ee_listener_unsub()
+            self._ee_listener_unsub = None
 
     def _cancel_refresh_timer(self) -> None:
         if self._timer_cancel:
@@ -503,46 +507,114 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
 
     async def _start_excess_export(self) -> None:
         await self._coordinator.async_write_dispatch([
-            1,
-            0, 32000,
-            0, 32000,
-            DISPATCH_MODE_SOC_CONTROL,
-            255,
-            0, 300,
+            1, 0, 32000, 0, 32000,
+            DISPATCH_MODE_SOC_CONTROL, 255, 0, 300,
         ])
         self._schedule_excess_export_refresh()
+        self._start_ee_watcher()
 
     def _schedule_excess_export_refresh(self) -> None:
-        self._cancel_timer()
+        self._cancel_refresh_timer()
         loop = self.hass.loop
 
         async def _refresh():
             if not self._is_on:
                 return
-            switches = self.hass.data[DOMAIN].get(f"{self._entry.entry_id}_switches", {})
-            pause_sw = switches.get("excess_export_pause")
-            if pause_sw and pause_sw.is_on:
-                # Paused — reschedule without re-dispatching
+            if self._coordinator.ee_paused:
                 self._schedule_excess_export_refresh()
                 return
             await self._start_excess_export()
 
         def _callback():
-            task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_excess_export_refresh")
+            task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_ee_refresh")
             self._pending_tasks.add(task)
             task.add_done_callback(self._pending_tasks.discard)
 
         self._timer_cancel = loop.call_later(240, _callback)
 
+    def _start_ee_watcher(self) -> None:
+        """Subscribe to coordinator updates to auto-pause/resume Excess Export.
+
+        Mirrors upstream AlphaESS_Excess_Export_Pause / _Resume automations:
+        - Pause when power_grid > 50 W (importing) or inverter not in normal mode.
+        - Resume when PV > 100 W, excess > 50 W or grid < -500 W, inverter in
+          normal mode for >= 10 min, and >= 15 s since last pause.
+        Both transitions include a 15-second debounce to prevent flapping.
+        """
+        if self._ee_listener_unsub is not None:
+            return
+
+        # If work mode is already normal, credit the 10-minute guard immediately
+        # so a user who just turned on EE doesn't wait 10 min for the first resume.
+        d = self._coordinator.data or {}
+        wm = d.get("inverter_work_mode")
+        if wm is not None and int(float(wm)) == 1:
+            self._ee_work_mode_1_since = time.monotonic() - 600
+        else:
+            self._ee_work_mode_1_since = None
+
+        def _check() -> None:
+            if not self._is_on:
+                return
+            d = self._coordinator.data or {}
+            grid = d.get("power_grid")
+            if grid is None:
+                return
+            wm = d.get("inverter_work_mode")
+            work_mode_normal = wm is not None and int(float(wm)) == 1
+            now = time.monotonic()
+
+            if work_mode_normal:
+                if self._ee_work_mode_1_since is None:
+                    self._ee_work_mode_1_since = now
+            else:
+                self._ee_work_mode_1_since = None
+
+            if not self._coordinator.ee_paused:
+                should_pause = float(grid) > 50 or not work_mode_normal
+                if should_pause and (now - self._ee_last_resume_time) >= 15:
+                    self._coordinator.ee_paused = True
+                    self._ee_last_pause_time = now
+                    task = self.hass.async_create_task(
+                        self._coordinator.async_reset_dispatch(),
+                        name="alphaess_ee_auto_pause",
+                    )
+                    self._pending_tasks.add(task)
+                    task.add_done_callback(self._pending_tasks.discard)
+            else:
+                pv = _calc_pv_production(d) or 0
+                hl = _calc_house_load(d) or 0
+                excess = max(0, pv - hl)
+                work_mode_ok = (
+                    work_mode_normal
+                    and self._ee_work_mode_1_since is not None
+                    and (now - self._ee_work_mode_1_since) >= 600
+                )
+                if (
+                    work_mode_ok
+                    and (now - self._ee_last_pause_time) >= 15
+                    and pv > 100
+                    and (excess > 50 or float(grid) < -500)
+                ):
+                    self._coordinator.ee_paused = False
+                    self._ee_last_resume_time = now
+                    task = self.hass.async_create_task(
+                        self._start_excess_export(),
+                        name="alphaess_ee_auto_resume",
+                    )
+                    self._pending_tasks.add(task)
+                    task.add_done_callback(self._pending_tasks.discard)
+
+        self._ee_listener_unsub = self._coordinator.async_add_listener(_check)
+
     # ------------------------------------------------------------------
-    # Excess Export Pause
+    # Force Import Pause (manual toggle — force_import only)
     # ------------------------------------------------------------------
 
     async def _handle_pause_turn_on(self) -> None:
         self._is_on = True
         self.async_write_ha_state()
         try:
-            # Write stopped-state dispatch; same payload as reset (start=0, 90s window)
             await self._coordinator.async_reset_dispatch()
         except Exception as err:
             _LOGGER.error("Failed to start %s: %s", self.switch_key, err)
@@ -554,20 +626,12 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         self._cancel_timer()
         self.async_write_ha_state()
         switches = self.hass.data[DOMAIN].get(f"{self._entry.entry_id}_switches", {})
-        if self.switch_key == "excess_export_pause":
-            parent_sw = switches.get("excess_export")
-            if parent_sw and parent_sw.is_on:
-                try:
-                    await parent_sw._start_excess_export()
-                except Exception as err:
-                    _LOGGER.error("Failed to resume excess_export after pause: %s", err)
-        elif self.switch_key == "force_import_pause":
-            parent_sw = switches.get("force_import")
-            if parent_sw and parent_sw.is_on:
-                try:
-                    await parent_sw._start_force_import()
-                except Exception as err:
-                    _LOGGER.error("Failed to resume force_import after pause: %s", err)
+        parent_sw = switches.get("force_import")
+        if parent_sw and parent_sw.is_on:
+            try:
+                await parent_sw._start_force_import()
+            except Exception as err:
+                _LOGGER.error("Failed to resume force_import after pause: %s", err)
 
     # ------------------------------------------------------------------
     # Force Import

@@ -104,6 +104,7 @@ class AlphaESSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.numbers: dict[str, float] = {}
         self.selects: dict[str, str] = {}
         self.ac_limit_w: int = 20000  # updated by inverter_ac_limit select entity
+        self.ee_paused: bool = False
 
     def get_number(self, key: str) -> float | None:
         return self.numbers.get(key)
