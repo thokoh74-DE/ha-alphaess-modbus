@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
@@ -31,6 +33,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = AlphaESSCoordinator(hass, client)
     await coordinator.async_config_entry_first_refresh()
 
+    raw_sn = (coordinator.data.get("inverter_sn") or "").strip().rstrip("\x00").strip()
+    _match = re.match(r"^(.+?)\d{4}", raw_sn)
+    if _match:
+        _model = _match.group(1).rstrip("-_ ").strip() or "SMILE series"
+    else:
+        _model = raw_sn[:20].strip() if raw_sn else "SMILE series"
+    _serial = raw_sn or None
+
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
     device_registry = dr.async_get(hass)
@@ -39,7 +49,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         identifiers={(DOMAIN, entry.entry_id)},
         name="AlphaESS Inverter",
         manufacturer="AlphaESS",
-        model="SMILE-M5-S-INV / SMILE series",
+        model=_model,
+        serial_number=_serial,
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
