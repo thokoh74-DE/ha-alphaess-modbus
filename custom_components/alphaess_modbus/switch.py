@@ -105,6 +105,9 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         state = await self.async_get_last_state()
         if state and state.state == "on":
             self._is_on = False  # Don't auto-resume dispatch on restart
+        self.async_on_remove(
+            self._coordinator.async_add_listener(self.async_write_ha_state)
+        )
 
     async def async_will_remove_from_hass(self) -> None:
         self._cancel_timer()
@@ -542,7 +545,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             # Write stopped-state dispatch; same payload as reset (start=0, 90s window)
             await self._coordinator.async_reset_dispatch()
         except Exception as err:
-            _LOGGER.error("Failed to start excess_export_pause: %s", err)
+            _LOGGER.error("Failed to start %s: %s", self.switch_key, err)
             self._is_on = False
             self.async_write_ha_state()
 

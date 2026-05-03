@@ -52,6 +52,9 @@ class AlphaESSSelect(RestoreEntity, SelectEntity):
         # Seed the coordinator cache so switch.py can read dispatch_mode immediately.
         if self._current_option:
             self._coordinator.selects[self._reg.key] = self._current_option
+        self.async_on_remove(
+            self._coordinator.async_add_listener(self.async_write_ha_state)
+        )
 
     @property
     def available(self) -> bool:

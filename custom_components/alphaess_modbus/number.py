@@ -85,6 +85,9 @@ class AlphaESSNumber(RestoreEntity, NumberEntity):
                 pass
         # Seed the coordinator cache so switch.py can read it immediately.
         self._coordinator.numbers[self._reg.key] = self._value
+        self.async_on_remove(
+            self._coordinator.async_add_listener(self.async_write_ha_state)
+        )
 
     @property
     def available(self) -> bool:
