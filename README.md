@@ -19,7 +19,7 @@ Based on the excellent YAML package by [Axel Koegler](https://projects.hillviewl
 - **Force Discharging** — discharge battery at configurable power, duration, and cutoff SoC; automatically stops 1% above the cutoff and resets dispatch so the inverter returns to self-consumption without any grid draw
 - **Force Export** — export battery to grid at configurable power, duration, and cutoff SoC; same zero-grid-draw auto-stop as Force Discharging
 - **Force Import** — import from grid at a configurable target kW, dynamically adjusting battery charge to offset live PV so total grid draw stays at the target; stops at cutoff SoC
-- **Excess Export** — prioritise grid export over battery charging to reduce PV clipping
+- **Excess Export** — prioritise grid export over battery charging to reduce PV clipping; automatically pauses when the house starts drawing from the grid and resumes once PV recovers
 - **Smart Export** — dynamically exports up to a configurable max power, accounting for live house load and PV so grid export stays at the target without overloading the inverter
 - **Battery cell health** — min/max cell voltages polled every 60 s; charge/discharge cutoff voltages, module count, capacity, and type available as diagnostic sensors
 - **Dispatch diagnostics** — energy flow direction (human-readable), PV switch state, frequency dispatch flag, power, and frequency
@@ -328,8 +328,8 @@ These are read-only sensor views of the scheduling registers. The writable equiv
 | Force Import | Switch | Import from grid at a target kW, dynamically adjusted for live PV so total grid draw stays at the target; stops at cutoff SoC |
 | Force Import Pause | Switch | Temporarily pause Force Import without losing its active state |
 | Dispatch | Switch | Generic dispatch — mode, power, SoC target, and duration all configurable independently |
-| Excess Export | Switch | Maximise PV export, reduce clipping (re-fires every 4 min) |
-| Excess Export Pause | Switch | Temporarily pause Excess Export without losing its active state |
+| Excess Export | Switch | Maximise PV export, reduce clipping; auto-pauses when house draws from grid, auto-resumes when PV recovers |
+| Excess Export Pause | Binary sensor | On when Excess Export has automatically paused due to grid import |
 | Smart Export | Switch | Dynamically exports up to Max Export Power, adjusted for live house load and PV (re-fires every 30 s) |
 | Force Charging Power | Number | Charging power in kW (0–20) |
 | Force Charging Duration | Number | Duration in minutes (0–480, step 5) |
