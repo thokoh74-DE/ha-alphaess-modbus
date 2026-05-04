@@ -118,6 +118,10 @@ class AlphaESSNumber(RestoreEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         self._value = value
         self._coordinator.numbers[self._reg.key] = value
+        # Optimistically mirror the new value into coordinator.data so native_value
+        # returns the written value immediately instead of the stale polled value.
+        if self._reg.address is not None and self._coordinator.data is not None:
+            self._coordinator.data[self._reg.key] = value
         self.async_write_ha_state()
 
         if self._reg.key in DISPATCH_PARAM_KEYS:
