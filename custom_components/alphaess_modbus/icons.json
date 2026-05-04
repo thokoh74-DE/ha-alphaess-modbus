@@ -1,0 +1,53 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "excess_export_pause": {"default": "mdi:pause-circle"},
+      "force_import_pause": {"default": "mdi:pause-circle"}
+    },
+    "switch": {
+      "force_charging": {"default": "mdi:battery-charging"},
+      "force_charging_hold": {"default": "mdi:battery-lock"},
+      "force_discharging": {"default": "mdi:battery-arrow-down"},
+      "force_export": {"default": "mdi:transmission-tower-export"},
+      "force_import": {"default": "mdi:transmission-tower-import"},
+      "force_import_hold": {"default": "mdi:transmission-tower-lock"},
+      "dispatch": {"default": "mdi:button-pointer"},
+      "excess_export": {"default": "mdi:solar-power"},
+      "smart_export": {"default": "mdi:transmission-tower-export"}
+    },
+    "number": {
+      "charging_cutoff_soc": {"default": "mdi:percent-box-outline"},
+      "discharging_cutoff_soc": {"default": "mdi:percent-box-outline"},
+      "max_feed_to_grid": {"default": "mdi:percent-box-outline"},
+      "force_charging_cutoff_soc": {"default": "mdi:percent-box-outline"},
+      "force_charging_duration": {"default": "mdi:clock-time-eight-outline"},
+      "force_charging_power": {"default": "mdi:flash"},
+      "force_discharging_cutoff_soc": {"default": "mdi:percent-box-outline"},
+      "force_discharging_duration": {"default": "mdi:clock-time-eight-outline"},
+      "force_discharging_power": {"default": "mdi:flash"},
+      "force_export_cutoff_soc": {"default": "mdi:percent-box-outline"},
+      "force_export_duration": {"default": "mdi:clock-time-eight-outline"},
+      "force_export_power": {"default": "mdi:flash"},
+      "dispatch_cutoff_soc": {"default": "mdi:percent-box-outline"},
+      "dispatch_duration": {"default": "mdi:clock-time-eight-outline"},
+      "dispatch_power": {"default": "mdi:flash"},
+      "force_import_cutoff_soc": {"default": "mdi:percent-box-outline"},
+      "force_import_duration": {"default": "mdi:clock-time-eight-outline"},
+      "force_import_power": {"default": "mdi:flash"},
+      "max_export_power": {"default": "mdi:transmission-tower-export"}
+    },
+    "select": {
+      "charging_discharging_settings": {"default": "mdi:battery-charging"},
+      "dispatch_mode": {"default": "mdi:battery-arrow-up-outline"},
+      "inverter_ac_limit": {"default": "mdi:transmission-tower"}
+    },
+    "button": {
+      "dispatch_reset": {"default": "mdi:restart"},
+      "synchronise_date_time": {"default": "mdi:clock-check-outline"},
+      "sync_dispatch_state": {"default": "mdi:sync"},
+      "restart_pcs": {"default": "mdi:restart"},
+      "restart_ems": {"default": "mdi:restart"},
+      "reset_energy_totals": {"default": "mdi:counter"}
+    }
+  }
+}

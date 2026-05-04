@@ -22,6 +22,9 @@
     "binary_sensor": {
       "excess_export_pause": {
         "name": "Excess Export Pause"
+      },
+      "force_import_pause": {
+        "name": "Force Import Pause"
       }
     },
     "switch": {
@@ -49,9 +52,6 @@
       "force_import_hold": {
         "name": "Force Import Hold"
       },
-      "force_import_pause": {
-        "name": "Force Import Pause"
-      },
       "smart_export": {
         "name": "Smart Export"
       }
@@ -70,7 +70,7 @@
         "name": "Force Charging Power"
       },
       "force_charging_cutoff_soc": {
-        "name": "Force Charging Cutoff SoC"
+        "name": "Force Charging Stop at SoC"
       },
       "force_charging_duration": {
         "name": "Force Charging Duration"
@@ -79,7 +79,7 @@
         "name": "Force Discharging Power"
       },
       "force_discharging_cutoff_soc": {
-        "name": "Force Discharging Cutoff SoC"
+        "name": "Force Discharging Stop at SoC"
       },
       "force_discharging_duration": {
         "name": "Force Discharging Duration"
@@ -88,7 +88,7 @@
         "name": "Force Export Power"
       },
       "force_export_cutoff_soc": {
-        "name": "Force Export Cutoff SoC"
+        "name": "Force Export Stop at SoC"
       },
       "force_export_duration": {
         "name": "Force Export Duration"
@@ -97,7 +97,7 @@
         "name": "Dispatch Power"
       },
       "dispatch_cutoff_soc": {
-        "name": "Dispatch Cutoff SoC"
+        "name": "Dispatch Stop at SoC"
       },
       "dispatch_duration": {
         "name": "Dispatch Duration"
@@ -106,7 +106,7 @@
         "name": "Force Import Power"
       },
       "force_import_cutoff_soc": {
-        "name": "Force Import Cutoff SoC"
+        "name": "Force Import Stop at SoC"
       },
       "force_import_duration": {
         "name": "Force Import Duration"

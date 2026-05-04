@@ -51,6 +51,7 @@ class ModbusNumberDef:
     mode: str = "slider"
     icon: str | None = None
     ac_limit_scaled: bool = False
+    default_value: float | None = None
 
 
 @dataclass
@@ -103,14 +104,17 @@ SENSOR_REGISTERS: list[ModbusSensorDef] = [
                     0x0645, "string", count=5, scan_interval=60,
                     state_class=None),
     ModbusSensorDef("ems_version_high", "EMS Version High",
-                    0x074B, "int16", precision=0, scan_interval=60),
+                    0x074B, "int16", precision=0, scan_interval=60,
+                    enabled_by_default=False),
     ModbusSensorDef("ems_version_middle", "EMS Version Middle",
-                    0x074C, "int16", precision=0, scan_interval=60),
+                    0x074C, "int16", precision=0, scan_interval=60,
+                    enabled_by_default=False),
     ModbusSensorDef("ems_version_low", "EMS Version Low",
-                    0x074D, "int16", precision=0, scan_interval=60),
+                    0x074D, "int16", precision=0, scan_interval=60,
+                    enabled_by_default=False),
     ModbusSensorDef("ems_version_low_suffix", "EMS Version Low Suffix",
                     0x074F, "string", count=3, scan_interval=60,
-                    state_class=None),
+                    state_class=None, enabled_by_default=False),
 
     # --- System time ---
     ModbusSensorDef("system_time_yymm", "System Time YYMM",
@@ -482,7 +486,7 @@ SENSOR_REGISTERS: list[ModbusSensorDef] = [
     ModbusSensorDef("dispatch_mode", "Dispatch Mode",
                     0x0885, "int16", precision=0, scan_interval=5),
     ModbusSensorDef("dispatch_soc", "Dispatch SoC",
-                    0x0886, "int16", unit="%", scale=0.392, scan_interval=5),
+                    0x0886, "int16", unit="%", scale=0.392, precision=0, scan_interval=5),
     ModbusSensorDef("dispatch_time", "Dispatch Time",
                     0x0887, "uint32", unit="s", precision=0, scan_interval=5),
     ModbusSensorDef("dispatch_energy_flow_direction", "Dispatch Energy Flow Direction",
@@ -514,7 +518,7 @@ NUMBER_REGISTERS: list[ModbusNumberDef] = [
                     icon="mdi:percent-box-outline"),
     # Dispatch-only params: address=None so no code path can write them directly.
     # Values are read by switch.py and assembled into the 9-register dispatch sequence.
-    ModbusNumberDef("force_charging_cutoff_soc", "Force Charging Cutoff SoC",
+    ModbusNumberDef("force_charging_cutoff_soc", "Force Charging Stop at SoC",
                     address=None,
                     min_value=4, max_value=100, step=1, unit="%",
                     icon="mdi:percent-box-outline"),
@@ -526,7 +530,7 @@ NUMBER_REGISTERS: list[ModbusNumberDef] = [
                     address=None,
                     min_value=0, max_value=20, step=0.1, unit="kW",
                     icon="mdi:flash", ac_limit_scaled=True),
-    ModbusNumberDef("force_discharging_cutoff_soc", "Force Discharging Cutoff SoC",
+    ModbusNumberDef("force_discharging_cutoff_soc", "Force Discharging Stop at SoC",
                     address=None,
                     min_value=4, max_value=100, step=1, unit="%",
                     icon="mdi:percent-box-outline"),
@@ -538,7 +542,7 @@ NUMBER_REGISTERS: list[ModbusNumberDef] = [
                     address=None,
                     min_value=0, max_value=20, step=0.1, unit="kW",
                     icon="mdi:flash", ac_limit_scaled=True),
-    ModbusNumberDef("force_export_cutoff_soc", "Force Export Cutoff SoC",
+    ModbusNumberDef("force_export_cutoff_soc", "Force Export Stop at SoC",
                     address=None,
                     min_value=4, max_value=100, step=1, unit="%",
                     icon="mdi:percent-box-outline"),
@@ -550,7 +554,7 @@ NUMBER_REGISTERS: list[ModbusNumberDef] = [
                     address=None,
                     min_value=0, max_value=20, step=0.1, unit="kW",
                     icon="mdi:flash", ac_limit_scaled=True),
-    ModbusNumberDef("dispatch_cutoff_soc", "Dispatch Cutoff SoC",
+    ModbusNumberDef("dispatch_cutoff_soc", "Dispatch Stop at SoC",
                     address=None,
                     min_value=4, max_value=100, step=1, unit="%",
                     icon="mdi:percent-box-outline"),
@@ -561,8 +565,8 @@ NUMBER_REGISTERS: list[ModbusNumberDef] = [
     ModbusNumberDef("dispatch_power", "Dispatch Power",
                     address=None,
                     min_value=-20, max_value=20, step=0.1, unit="kW",
-                    icon="mdi:flash", ac_limit_scaled=True),
-    ModbusNumberDef("force_import_cutoff_soc", "Force Import Cutoff SoC",
+                    icon="mdi:flash", ac_limit_scaled=True, default_value=0),
+    ModbusNumberDef("force_import_cutoff_soc", "Force Import Stop at SoC",
                     address=None,
                     min_value=4, max_value=100, step=1, unit="%",
                     icon="mdi:percent-box-outline"),

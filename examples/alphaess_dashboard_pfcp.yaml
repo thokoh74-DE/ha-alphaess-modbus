@@ -209,7 +209,7 @@ views:
               - entity: number.alphaess_inverter_max_export_power
                 name: Max Export (kW)
               - entity: number.alphaess_inverter_force_export_cutoff_soc
-                name: SoC Floor (%)
+                name: Stop at SoC (%)
 
           - type: entities
             title: Force Import
@@ -220,15 +220,15 @@ views:
                 name: Enable
               - entity: switch.alphaess_inverter_force_import_hold
                 name: Hold After Duration
-              - entity: switch.alphaess_inverter_force_import_pause
-                name: Pause
+              - entity: binary_sensor.alphaess_inverter_force_import_pause
+                name: Paused
               - type: section
               - entity: number.alphaess_inverter_force_import_power
                 name: Import Power (kW)
               - entity: number.alphaess_inverter_force_import_duration
                 name: Duration (min)
               - entity: number.alphaess_inverter_force_import_cutoff_soc
-                name: SoC Target (%)
+                name: Stop at SoC (%)
 
       # ---------------------------------------------------------------------------
       # ROW 3 - Schedule & settings
@@ -315,7 +315,7 @@ views:
               - entity: sensor.alphaess_inverter_dispatch_mode
                 name: Active Mode
               - entity: sensor.alphaess_inverter_dispatch_soc
-                name: SoC Target
+                name: Stop at SoC
               - entity: sensor.alphaess_inverter_dispatch_time
                 name: Time Remaining
               - entity: sensor.alphaess_inverter_dispatch_energy_flow_direction
@@ -350,6 +350,11 @@ views:
           - type: entities
             title: System
             entities:
+              - entity: sensor.alphaess_inverter_bms_version
+                name: BMS Version
+              - entity: sensor.alphaess_inverter_ems_version
+                name: EMS Version
+              - type: section
               - entity: sensor.alphaess_inverter_inverter_temperature
                 name: Inverter Temperature
               - entity: sensor.alphaess_inverter_inverter_work_mode

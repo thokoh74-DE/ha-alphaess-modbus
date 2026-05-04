@@ -72,7 +72,7 @@ class AlphaESSNumber(RestoreEntity, NumberEntity):
         self._attr_mode = NumberMode.SLIDER
         self._attr_icon = reg.icon
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
-        self._value: float = reg.min_value
+        self._value: float = reg.default_value if reg.default_value is not None else reg.min_value
 
     async def async_added_to_hass(self) -> None:
         state = await self.async_get_last_state()
