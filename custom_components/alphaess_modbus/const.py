@@ -139,13 +139,13 @@ SENSOR_REGISTERS: list[ModbusSensorDef] = [
                     enabled_by_default=False),
     ModbusSensorDef("local_ip", "Local IP",
                     0x0809, "uint32", scan_interval=60,
-                    enabled_by_default=False),
+                    state_class=None, enabled_by_default=False),
     ModbusSensorDef("subnet_mask", "Subnet Mask",
                     0x080B, "uint32", scan_interval=60,
-                    enabled_by_default=False),
+                    state_class=None, enabled_by_default=False),
     ModbusSensorDef("gateway", "Gateway",
                     0x080D, "uint32", scan_interval=60,
-                    enabled_by_default=False),
+                    state_class=None, enabled_by_default=False),
 
     # --- Power: grid ---
     ModbusSensorDef("power_grid", "Grid Power",
