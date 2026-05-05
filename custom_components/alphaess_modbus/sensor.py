@@ -26,17 +26,19 @@ class CalculatedSensorDef:
     key: str
     name: str
     unit: str
-    device_class: str
+    device_class: str | None
 
 
 CALCULATED_SENSORS: list[CalculatedSensorDef] = [
     CalculatedSensorDef("current_pv_production", "Current PV Production", "W", "power"),
     CalculatedSensorDef("current_house_load", "Current House Load", "W", "power"),
+    CalculatedSensorDef("battery_remaining_time", "Battery Remaining Time", "min", "duration"),
 ]
 
 _DEVICE_CLASS_MAP = {
     "battery": SensorDeviceClass.BATTERY,
     "current": SensorDeviceClass.CURRENT,
+    "duration": getattr(SensorDeviceClass, "DURATION", None),
     "energy": SensorDeviceClass.ENERGY,
     "energy_storage": getattr(SensorDeviceClass, "ENERGY_STORAGE", None),
     "frequency": SensorDeviceClass.FREQUENCY,
@@ -182,6 +184,23 @@ class AlphaESSCalculatedSensor(CoordinatorEntity[AlphaESSCoordinator], SensorEnt
             if pv is None or battery is None:
                 return None
             return max(0, int(pv) + int(battery) + int(grid))
+
+        if self._defn.key == "battery_remaining_time":
+            raw = d.get("battery_remaining_time_raw")
+            if raw is not None and int(raw) != 0:
+                return int(raw)
+            soc = d.get("soc_battery")
+            capacity = d.get("battery_capacity_kwh")
+            power_w = d.get("power_battery")
+            if soc is None or capacity is None or power_w is None:
+                return None
+            soc = float(soc)
+            capacity = float(capacity)
+            power_w = float(power_w)
+            if capacity <= 0 or abs(power_w) < 50:
+                return None
+            remaining_kwh = (soc / 100.0 * capacity) if power_w < 0 else ((100.0 - soc) / 100.0 * capacity)
+            return max(0, int(remaining_kwh / abs(power_w) * 1000.0 * 60.0))
 
         return None
 
