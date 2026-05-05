@@ -10,7 +10,7 @@
       "force_discharging": {"default": "mdi:battery-arrow-down"},
       "force_export": {"default": "mdi:transmission-tower-export"},
       "force_import": {"default": "mdi:transmission-tower-import"},
-      "force_import_hold": {"default": "mdi:transmission-tower-lock"},
+      "force_import_hold": {"default": "mdi:battery-lock"},
       "dispatch": {"default": "mdi:button-pointer"},
       "excess_export": {"default": "mdi:solar-power"},
       "smart_export": {"default": "mdi:transmission-tower-export"}

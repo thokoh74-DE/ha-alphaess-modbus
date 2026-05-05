@@ -54,7 +54,7 @@ SWITCH_DEFS = [
     {"key": "force_discharging",   "name": "Force Discharging",    "icon": "mdi:battery-arrow-down"},
     {"key": "force_export",        "name": "Force Export",         "icon": "mdi:transmission-tower-export"},
     {"key": "force_import",        "name": "Force Import",         "icon": "mdi:transmission-tower-import"},
-    {"key": "force_import_hold",   "name": "Force Import Hold",    "icon": "mdi:transmission-tower-lock"},
+    {"key": "force_import_hold",   "name": "Force Import Hold",    "icon": "mdi:battery-lock"},
     {"key": "dispatch",            "name": "Dispatch",             "icon": "mdi:button-pointer"},
     {"key": "excess_export",       "name": "Excess Export",        "icon": "mdi:solar-power"},
     {"key": "smart_export",        "name": "Smart Export",         "icon": "mdi:transmission-tower-export"},
