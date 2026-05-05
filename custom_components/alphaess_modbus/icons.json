@@ -48,6 +48,14 @@
       "restart_pcs": {"default": "mdi:restart"},
       "restart_ems": {"default": "mdi:restart"},
       "reset_energy_totals": {"default": "mdi:counter"}
+    },
+    "sensor": {
+      "dispatch_pv_switch": {"default": "mdi:solar-power"},
+      "dispatch_countdown": {"default": "mdi:timer-outline"},
+      "local_ip": {"default": "mdi:ip-network"},
+      "subnet_mask": {"default": "mdi:ip-network"},
+      "gateway": {"default": "mdi:ip-network"},
+      "ip_method": {"default": "mdi:ip"}
     }
   }
 }

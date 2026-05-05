@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -13,6 +14,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, SENSOR_REGISTERS, ModbusSensorDef
@@ -52,6 +54,7 @@ _SENSOR_ENUM_LOOKUPS: dict[str, dict[int, str]] = {
         4: "Grid to Battery",
         5: "Battery to Grid 2",
     },
+    "ip_method": {0: "DHCP", 1: "Static"},
 }
 
 _STATE_CLASS_MAP = {
@@ -69,10 +72,21 @@ def _fmt_version(v: Any) -> str:
         return str(v)
 
 
+def _fmt_ip(v: Any) -> str:
+    try:
+        n = int(v)
+        return f"{(n >> 24) & 0xFF}.{(n >> 16) & 0xFF}.{(n >> 8) & 0xFF}.{n & 0xFF}"
+    except (TypeError, ValueError):
+        return str(v)
+
+
 _SENSOR_FORMATTERS: dict[str, Callable[[Any], Any]] = {
     "bms_version": _fmt_version,
     "lmu_version": _fmt_version,
     "iso_version": _fmt_version,
+    "local_ip": _fmt_ip,
+    "subnet_mask": _fmt_ip,
+    "gateway": _fmt_ip,
 }
 
 
@@ -87,6 +101,7 @@ async def async_setup_entry(
         AlphaESSCalculatedSensor(coordinator, entry, defn) for defn in CALCULATED_SENSORS
     ]
     entities.append(AlphaESSEmsVersionSensor(coordinator, entry))
+    entities.append(AlphaESSDispatchCountdownSensor(coordinator, entry))
     async_add_entities(entities)
 
 
@@ -215,3 +230,42 @@ class AlphaESSEmsVersionSensor(AlphaESSCombinedSensor):
 
     def _format(self, high: Any, middle: Any, low: Any, suffix: Any) -> str:
         return f"V{int(high)}.{int(middle)}.{int(low)}{suffix or ''}"
+
+
+class AlphaESSDispatchCountdownSensor(CoordinatorEntity[AlphaESSCoordinator], SensorEntity):
+    _attr_has_entity_name = True
+    _attr_native_unit_of_measurement = "s"
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_translation_key = "dispatch_countdown"
+
+    def __init__(self, coordinator: AlphaESSCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._attr_name = "Dispatch Time Remaining"
+        self._attr_unique_id = f"{entry.entry_id}_dispatch_countdown"
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
+        self._unsub: Callable | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._unsub = async_track_time_interval(
+            self.hass, self._tick, timedelta(seconds=1)
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._unsub:
+            self._unsub()
+            self._unsub = None
+
+    async def _tick(self, _now: datetime) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> int | None:
+        started = self.coordinator.dispatch_started_at
+        dur = self.coordinator.dispatch_duration_s
+        if started is None or dur <= 0:
+            return None
+        elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+        remaining = max(0, int(dur - elapsed))
+        return remaining

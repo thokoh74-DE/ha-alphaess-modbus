@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -106,6 +106,8 @@ class AlphaESSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.ac_limit_w: int = 20000  # updated by inverter_ac_limit select entity
         self.ee_paused: bool = False
         self.fi_paused: bool = False
+        self.dispatch_started_at: datetime | None = None
+        self.dispatch_duration_s: int = 0
 
     def get_number(self, key: str) -> float | None:
         return self.numbers.get(key)
@@ -204,6 +206,12 @@ class AlphaESSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_write_dispatch(self, values: list[int]) -> None:
         from .const import DISPATCH_START_ADDR
         await self.client.write_registers(DISPATCH_START_ADDR, values)
+        if values and values[0] == 1 and len(values) >= 9:
+            self.dispatch_started_at = datetime.now(timezone.utc)
+            self.dispatch_duration_s = int(values[8])
+        else:
+            self.dispatch_started_at = None
+            self.dispatch_duration_s = 0
 
     async def async_reset_dispatch(self) -> None:
         await self.async_write_dispatch([

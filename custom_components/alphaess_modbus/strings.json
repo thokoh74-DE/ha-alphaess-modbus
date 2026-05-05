@@ -126,6 +126,11 @@
         "name": "Inverter AC Limit"
       }
     },
+    "sensor": {
+      "dispatch_countdown": {
+        "name": "Dispatch Time Remaining"
+      }
+    },
     "button": {
       "dispatch_reset": {
         "name": "Dispatch Reset"
