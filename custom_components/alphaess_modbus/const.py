@@ -419,7 +419,7 @@ SENSOR_REGISTERS: list[ModbusSensorDef] = [
                     0x0118, "uint16", precision=0, scan_interval=300, enabled_by_default=False),
     ModbusSensorDef("battery_capacity_kwh", "Battery Capacity",
                     0x0119, "uint16", unit="kWh", device_class="energy_storage",
-                    scale=0.001, precision=2, scan_interval=300, enabled_by_default=False),
+                    scale=0.1, precision=1, scan_interval=300, enabled_by_default=False),
     ModbusSensorDef("battery_type", "Battery Type",
                     0x011A, "uint16", precision=0, scan_interval=300, enabled_by_default=False),
     # --- PV settings (read-only view) ---
