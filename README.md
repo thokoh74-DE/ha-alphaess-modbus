@@ -429,6 +429,7 @@ Example Lovelace dashboard configurations are included in the [`examples/`](exam
 ## Changelog
 
 ### v1.9.5
+- **fix:** Battery Status sensor now displays as an integer instead of a float (e.g. `1` not `1.0`).
 - **fix:** Force Import Hold switch now displays the correct icon (`mdi:battery-lock`); the previously assigned `mdi:transmission-tower-lock` does not exist in the MDI icon set bundled with Home Assistant.
 - **fix:** BMS Version, LMU Version, and ISO Version sensors now have `state_class: None`, preventing a `ValueError` that crashed the coordinator update loop after every initial load in recent HA versions.
 - **fix:** Register-backed number sliders (Charging/Discharging Cutoff SoC, Max Feed to Grid) now update immediately when written instead of reverting until the next poll cycle.
