@@ -169,7 +169,7 @@ There is no user-configurable poll interval — intervals are tuned per-sensor t
 | Battery Max Discharge Current | A | 10 s | BMS-reported maximum |
 | Battery Voltage | V | 60 s | Pack terminal voltage |
 | Battery Current | A | 60 s | Pack current |
-| Battery Status | - | 60 s | BMS status code |
+| Battery Status | - | 60 s | Human-readable BMS status with raw value, e.g. "Charging + Discharging (257)" |
 | Battery Remaining Time | min | 60 s | |
 | Battery Min Cell Voltage | V | 60 s | Lowest cell voltage in pack (3 d.p.) |
 | Battery Max Cell Voltage | V | 60 s | Highest cell voltage in pack (3 d.p.) |
@@ -228,7 +228,7 @@ There is no user-configurable poll interval — intervals are tuned per-sensor t
 | Dispatch Time | s | 5 s | Remaining dispatch duration |
 | Dispatch Energy Flow Direction | - | 5 s | Human-readable flow direction: PV to Grid, Battery to Grid, Grid to Battery, etc. |
 | Freq Dispatch Flag | - | 5 s | 0 = Normal, 1 = frequency dispatch active |
-| Dispatch PV Switch *(disabled)* | - | 5 s | PV switch state during dispatch |
+| Dispatch PV Switch | - | 5 s | PV switch state during dispatch |
 | Freq Dispatch Power *(disabled)* | W | 5 s | Frequency dispatch power setpoint |
 | Freq Dispatch Frequency *(disabled)* | Hz | 5 s | Frequency dispatch trigger frequency |
 
@@ -282,10 +282,10 @@ These are read-only sensor views of the scheduling registers. The writable equiv
 | Entity | Unit | Poll | Description |
 |--------|------|------|-------------|
 | Modbus Baud Rate *(disabled)* | - | 60 s | |
-| IP Method *(disabled)* | - | 60 s | 0 = DHCP, 1 = Static |
-| Local IP (raw) *(disabled)* | - | 60 s | 32-bit packed IP address |
-| Subnet Mask (raw) *(disabled)* | - | 60 s | 32-bit packed subnet mask |
-| Gateway (raw) *(disabled)* | - | 60 s | 32-bit packed gateway address |
+| IP Method *(disabled)* | - | 60 s | DHCP or Static |
+| Local IP *(disabled)* | - | 60 s | Dotted-decimal IP address, e.g. 10.0.0.209 |
+| Subnet Mask *(disabled)* | - | 60 s | Dotted-decimal subnet mask |
+| Gateway *(disabled)* | - | 60 s | Dotted-decimal gateway address |
 
 #### Grid Safety (all disabled by default)
 
@@ -428,6 +428,9 @@ Example Lovelace dashboard configurations are included in the [`examples/`](exam
 
 ## Changelog
 
+### v1.10.0-beta.5
+- **feat:** Battery Status sensor now shows a human-readable label alongside the raw value, e.g. "Charging + Discharging (257)" instead of just "257".
+
 ### v1.10.0-beta.4
 - **fix:** `local_ip`, `subnet_mask`, and `gateway` sensors were missing `state_class=None`, causing HA to treat them as numeric sensors. HA raised a `ValueError: could not convert string to float` on startup and failed to add the entities.
 - **fix:** Battery Capacity (`battery_capacity_kwh`) scale corrected from 0.001 to 0.1. This also fixes Battery Remaining Time which depends on the capacity value.
@@ -522,6 +525,8 @@ Example Lovelace dashboard configurations are included in the [`examples/`](exam
 ## Credits
 
 This integration is based on the YAML package developed by **Axel Koegler** and documented at [projects.hillviewlodge.ie/alphaess](https://projects.hillviewlodge.ie/alphaess/). All Modbus register mappings are derived from that work and the AlphaESS Modbus register documentation.
+
+Documentation and release notes assisted by [Claude](https://claude.ai) (Anthropic).
 
 ---
 
