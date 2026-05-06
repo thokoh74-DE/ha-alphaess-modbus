@@ -428,21 +428,17 @@ Example Lovelace dashboard configurations are included in the [`examples/`](exam
 
 ## Changelog
 
-### v1.10.0-beta.6
-- **fix:** Excess Export Pause binary sensor was showing "Pause" instead of "Excess Export Pause" due to a stale entity registry name. Name is now set explicitly.
-- **fix:** Force Import Pause binary sensor was showing the full device-prefixed name "AlphaESS Inverter Force Import Pause" instead of just "Force Import Pause". Both pause sensors now follow the same naming convention.
-- **fix:** Dispatch Time sensor was displaying raw seconds with a thousands separator (e.g. "10,800 s" for 180 minutes). It now shows a human-readable duration string (e.g. "3h 00m", "30m").
-
-### v1.10.0-beta.5
+### v1.10.0
+- **feat:** Dispatch PV Switch sensor is now enabled by default.
+- **feat:** Local IP, Subnet Mask, and Gateway sensors now display as dotted-decimal strings (e.g. `10.0.0.209`) instead of raw integers. IP Method shows `DHCP` or `Static`.
+- **feat:** New Dispatch Time Remaining sensor (`sensor.alphaess_inverter_dispatch_countdown`) counts down from the configured dispatch duration in real time.
 - **feat:** Battery Status sensor now shows a human-readable label alongside the raw value, e.g. "Charging + Discharging (257)" instead of just "257".
-
-### v1.10.0-beta.4
-- **fix:** `local_ip`, `subnet_mask`, and `gateway` sensors were missing `state_class=None`, causing HA to treat them as numeric sensors. HA raised a `ValueError: could not convert string to float` on startup and failed to add the entities.
-- **fix:** Battery Capacity (`battery_capacity_kwh`) scale corrected from 0.001 to 0.1. This also fixes Battery Remaining Time which depends on the capacity value.
-- **fix:** Battery Remaining Time always returned 0 on ALD-series inverters. Replaced the raw register with a calculated sensor using live SOC, battery capacity, and battery power.
-- **feat:** Dispatch PV Switch (`register 0x088A`) is now enabled by default.
-- **feat:** `local_ip`, `subnet_mask`, and `gateway` now display as dotted-decimal strings (e.g. `10.0.0.209`) instead of raw integers. `ip_method` shows `DHCP` or `Static`.
-- **feat:** New `sensor.alphaess_inverter_dispatch_countdown` counts down from the configured dispatch duration in real time.
+- **feat:** Dispatch Time sensor now shows a human-readable duration string (e.g. "3h 00m", "30m") instead of raw seconds with a thousands separator.
+- **fix:** Local IP, Subnet Mask, and Gateway sensors were missing `state_class=None`, causing a `ValueError` on HA startup that prevented those entities from loading.
+- **fix:** Battery Capacity scale corrected from 0.001 to 0.1 (reported values were 100x too small). Also fixes Battery Remaining Time which depends on the capacity value.
+- **fix:** Battery Remaining Time always returned 0 on ALD-series inverters. Now calculated from live SoC, capacity, and battery power.
+- **fix:** Excess Export Pause binary sensor was displaying "Pause" instead of "Excess Export Pause".
+- **fix:** Force Import Pause binary sensor was displaying the full device-prefixed name instead of "Force Import Pause".
 
 ### v1.9.5
 - **fix:** Battery Status sensor now displays as an integer instead of a float (e.g. `1` not `1.0`).
