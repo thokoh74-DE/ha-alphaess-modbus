@@ -492,7 +492,7 @@ SENSOR_REGISTERS: list[ModbusSensorDef] = [
     ModbusSensorDef("dispatch_soc", "Dispatch SoC",
                     0x0886, "int16", unit="%", scale=0.392, precision=0, scan_interval=5),
     ModbusSensorDef("dispatch_time", "Dispatch Time",
-                    0x0887, "uint32", unit="s", precision=0, scan_interval=5),
+                    0x0887, "uint32", state_class=None, scan_interval=5),
     ModbusSensorDef("dispatch_energy_flow_direction", "Dispatch Energy Flow Direction",
                     0x0889, "uint16", precision=0, scan_interval=5, state_class=None,
                     enabled_by_default=True),

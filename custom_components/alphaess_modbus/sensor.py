@@ -101,6 +101,20 @@ def _fmt_battery_status(v: Any) -> str:
         return str(v)
 
 
+def _fmt_duration_s(v: Any) -> str:
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        return str(v)
+    if n <= 0:
+        return "0m"
+    hours, remainder = divmod(n, 3600)
+    minutes = remainder // 60
+    if hours > 0:
+        return f"{hours}h {minutes:02d}m"
+    return f"{minutes}m"
+
+
 _SENSOR_FORMATTERS: dict[str, Callable[[Any], Any]] = {
     "bms_version": _fmt_version,
     "lmu_version": _fmt_version,
@@ -109,6 +123,7 @@ _SENSOR_FORMATTERS: dict[str, Callable[[Any], Any]] = {
     "subnet_mask": _fmt_ip,
     "gateway": _fmt_ip,
     "battery_status": _fmt_battery_status,
+    "dispatch_time": _fmt_duration_s,
 }
 
 
