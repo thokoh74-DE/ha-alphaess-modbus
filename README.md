@@ -72,6 +72,15 @@ Based on the excellent YAML package by [Axel Koegler](https://projects.hillviewl
 
 4. Click **Submit** — Home Assistant will test the connection before saving
 
+### Multiple Inverters
+
+To run two AlphaESS inverters with the same Home Assistant instance:
+
+1. Add the integration a second time: **Settings → Devices & Services → Add Integration**, search for **AlphaESS Modbus TCP**, and enter the second inverter's IP address.
+2. Immediately rename each device so entity IDs reflect the device name: **Settings → Devices & Services → [device] → pencil icon**. For example, rename one to "AlphaESS Roof" and the other to "AlphaESS Garage".
+3. Home Assistant updates all entity IDs automatically — `sensor.alphaess_inverter_*` becomes `sensor.alphaess_roof_*` and `sensor.alphaess_garage_*`.
+4. Each integration instance maintains its own Modbus TCP connection. The inverter one-connection limit applies per device — the two instances do not share a connection and do not interfere with each other.
+
 ---
 
 ## Poll Intervals
