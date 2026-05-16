@@ -131,16 +131,18 @@ B3 and B3PLUS inverters report some registers with different scale factors. Sele
 
 #### Power (real-time)
 
+These sensors have a 1 s `scan_interval` but the master loop runs at 2 s in Normal mode, so the effective update rate is 2 s by default. Selecting Fast mode reduces the loop to 1 s, achieving the full 1 s rate.
+
 | Entity | Unit | Poll | Description |
 |--------|------|------|-------------|
-| Grid Power | W | 1 s | Positive = import from grid, negative = export to grid |
-| Battery Power | W | 1 s | Power to/from battery |
-| Active Power PV Meter | W | 1 s | PV generation measured at the meter point |
-| PV String 1 Power | W | 1 s | |
-| PV String 2 Power | W | 1 s | |
-| PV String 3 Power | W | 1 s | |
-| PV String 4 Power | W | 1 s | |
-| PV Total Power (Inverter) *(disabled)* | W | 1 s | Sum of all PV strings per inverter register 0x0453 |
+| Grid Power | W | 2 s (1 s Fast) | Positive = import from grid, negative = export to grid |
+| Battery Power | W | 2 s (1 s Fast) | Power to/from battery |
+| Active Power PV Meter | W | 2 s (1 s Fast) | PV generation measured at the meter point |
+| PV String 1 Power | W | 2 s (1 s Fast) | |
+| PV String 2 Power | W | 2 s (1 s Fast) | |
+| PV String 3 Power | W | 2 s (1 s Fast) | |
+| PV String 4 Power | W | 2 s (1 s Fast) | |
+| PV Total Power (Inverter) *(disabled)* | W | 2 s (1 s Fast) | Sum of all PV strings per inverter register 0x0453 |
 | Current PV Production | W | calculated | Sum of all PV string powers + PV meter |
 | Current House Load | W | calculated | Net house consumption derived from grid, battery, and PV |
 
