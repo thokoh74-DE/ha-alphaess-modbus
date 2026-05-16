@@ -582,11 +582,6 @@ NUMBER_REGISTERS: list[ModbusNumberDef] = [
                     address=None,
                     min_value=0, max_value=20, step=0.1, unit="kW",
                     icon="mdi:flash", ac_limit_scaled=True),
-    ModbusNumberDef("max_export_power", "Max Export Power",
-                    address=None,
-                    min_value=0, max_value=20, step=0.1, unit="kW",
-                    icon="mdi:transmission-tower-export", ac_limit_scaled=True),
-
     # Charging/discharging period times are handled by the time platform (time.py)
     # using ModbusTimeDef entries in TIME_REGISTERS below.
 ]
