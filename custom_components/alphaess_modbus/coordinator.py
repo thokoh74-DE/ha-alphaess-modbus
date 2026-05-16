@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from pymodbus.exceptions import ModbusException
 
-from .const import DOMAIN, SENSOR_REGISTERS, ModbusSensorDef
+from .const import DOMAIN, SENSOR_REGISTERS, ModbusSensorDef, B3_SCALE_OVERRIDES
 from .modbus_client import AlphaESSModbusClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -104,6 +104,7 @@ class AlphaESSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             name=DOMAIN,
             update_interval=timedelta(seconds=loop_interval),
         )
+        self._model_variant: str = options.get("model_variant", "standard")
         self.client = client
         self._last_polled: dict[str, float] = {}
         self._fast_soc_refcount: int = 0
@@ -166,7 +167,21 @@ class AlphaESSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 for reg in g_regs:
                     offset = reg.address - g_start
                     try:
-                        data[reg.key] = _decode_block(reg, raw, offset)
+                        value = _decode_block(reg, raw, offset)
+                        if self._model_variant == "b3" and reg.key in B3_SCALE_OVERRIDES:
+                            v_raw = raw[offset]
+                            if reg.data_type == "int16" and v_raw > 32767:
+                                v_raw -= 65536
+                            elif reg.data_type == "int32":
+                                v_raw = (raw[offset] << 16) | raw[offset + 1]
+                                if v_raw > 2147483647:
+                                    v_raw -= 4294967296
+                            value = (v_raw + reg.offset) * B3_SCALE_OVERRIDES[reg.key]
+                            if reg.precision is not None:
+                                value = round(value, reg.precision)
+                                if reg.precision == 0:
+                                    value = int(value)
+                        data[reg.key] = value
                         self._last_polled[reg.key] = now
                     except Exception as decode_err:
                         errors.append(f"{reg.key}: decode error: {decode_err}")

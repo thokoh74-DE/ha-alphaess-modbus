@@ -108,6 +108,17 @@ The integration offers three poll speed presets, configurable via the integratio
 
 The Slow and Fast multipliers can be adjusted in the options form (range 0.25-10.0, step 0.25). Fast mode on low-spec hardware (Raspberry Pi 3 or similar) may impact Home Assistant performance due to the increased polling rate.
 
+### Model Variants
+
+The integration supports two model variants, configurable via the integration's **Configure** button in Settings → Devices & Services:
+
+| Variant | Inverter models |
+|---------|----------------|
+| Standard | All AlphaESS models except B3/B3PLUS (default) |
+| SMILE-B3 / SMILE-B3-PLUS | SMILE-B3 and SMILE-B3-PLUS only |
+
+B3 and B3PLUS inverters report some registers with different scale factors. Selecting the wrong variant will show incorrect values for grid voltage and inverter power registers. If you own a SMILE-B3 or SMILE-B3-PLUS, select that variant after installation.
+
 ---
 
 ## Entities

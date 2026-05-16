@@ -26,12 +26,14 @@
         "data": {
           "poll_mode": "Poll Mode",
           "slow_multiplier": "Slow Mode Interval Multiplier",
-          "fast_multiplier": "Fast Mode Interval Multiplier"
+          "fast_multiplier": "Fast Mode Interval Multiplier",
+          "model_variant": "Inverter Model Variant"
         },
         "data_description": {
           "poll_mode": "Slow (3x longer), Normal (default), or Fast (0.5x shorter). Fast mode also reduces the coordinator loop from 2 s to 1 s.",
           "slow_multiplier": "Multiplier applied to all scan intervals in Slow mode (default 3.0, range 0.25-10.0).",
-          "fast_multiplier": "Multiplier applied to all scan intervals in Fast mode (default 0.5, range 0.25-10.0). Fast mode on low-spec hardware (Raspberry Pi 3 or similar) may impact Home Assistant performance."
+          "fast_multiplier": "Multiplier applied to all scan intervals in Fast mode (default 0.5, range 0.25-10.0). Fast mode on low-spec hardware (Raspberry Pi 3 or similar) may impact Home Assistant performance.",
+          "model_variant": "Select Standard for most inverters. Select SMILE-B3 / SMILE-B3-PLUS if your inverter is a SMILE-B3 or SMILE-B3-PLUS - these models use different scale factors for voltage and inverter power registers."
         }
       }
     }
@@ -144,6 +146,18 @@
     "sensor": {
       "dispatch_countdown": {
         "name": "Dispatch Time Remaining"
+      },
+      "force_charging_countdown": {
+        "name": "Force Charging Countdown"
+      },
+      "force_discharging_countdown": {
+        "name": "Force Discharging Countdown"
+      },
+      "force_export_countdown": {
+        "name": "Force Export Countdown"
+      },
+      "force_import_countdown": {
+        "name": "Force Import Countdown"
       }
     },
     "button": {

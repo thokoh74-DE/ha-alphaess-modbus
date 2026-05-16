@@ -84,6 +84,7 @@ class AlphaESSOptionsFlowHandler(config_entries.OptionsFlow):
         poll_mode = options.get("poll_mode", "normal")
         slow_multiplier = options.get("slow_multiplier", 3.0)
         fast_multiplier = options.get("fast_multiplier", 0.5)
+        model_variant = options.get("model_variant", "standard")
 
         schema = vol.Schema({
             vol.Required("poll_mode", default=poll_mode): selector.SelectSelector(
@@ -106,6 +107,15 @@ class AlphaESSOptionsFlowHandler(config_entries.OptionsFlow):
                 selector.NumberSelectorConfig(
                     min=0.25, max=10.0, step=0.25,
                     mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Required("model_variant", default=model_variant): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[
+                        {"value": "standard", "label": "Standard"},
+                        {"value": "b3",       "label": "SMILE-B3 / SMILE-B3-PLUS"},
+                    ],
+                    mode=selector.SelectSelectorMode.LIST,
                 )
             ),
         })

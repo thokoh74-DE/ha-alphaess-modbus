@@ -650,6 +650,41 @@ TIME_REGISTERS: list[ModbusTimeDef] = [
 ]
 
 # ---------------------------------------------------------------------------
+# B3 / B3PLUS model scale overrides
+# Source: integration_alpha_ess.yaml v10.5 (comments "X for SMILE-B3/SMILE-B3-PLUS")
+# B3 and B3PLUS share identical scales, so a single "b3" variant covers both.
+#
+# | key                    | std scale | B3 scale |
+# |------------------------|-----------|----------|
+# | inverter_temperature   |   0.1     |   0.01   |
+# | voltage_phase_a_grid   |   1.0     |   0.1    |
+# | voltage_phase_b_grid   |   1.0     |   0.1    |
+# | voltage_phase_c_grid   |   1.0     |   0.1    |
+# | power_inverter_l1      |   1.0     |   0.1    |
+# | power_inverter_l2      |   1.0     |   0.1    |
+# | power_inverter_l3      |   1.0     |   0.1    |
+# | power_inverter         |   1.0     |   0.1    |
+# | backup_power_inverter_l1|  1.0     |   0.1    |
+# | backup_power_inverter_l2|  1.0     |   0.1    |
+# | backup_power_inverter_l3|  1.0     |   0.1    |
+# | backup_power_inverter  |   1.0     |   0.1    |
+# ---------------------------------------------------------------------------
+B3_SCALE_OVERRIDES: dict[str, float] = {
+    "inverter_temperature":    0.01,
+    "voltage_phase_a_grid":    0.1,
+    "voltage_phase_b_grid":    0.1,
+    "voltage_phase_c_grid":    0.1,
+    "power_inverter_l1":       0.1,
+    "power_inverter_l2":       0.1,
+    "power_inverter_l3":       0.1,
+    "power_inverter":          0.1,
+    "backup_power_inverter_l1": 0.1,
+    "backup_power_inverter_l2": 0.1,
+    "backup_power_inverter_l3": 0.1,
+    "backup_power_inverter":   0.1,
+}
+
+# ---------------------------------------------------------------------------
 # Dispatch register base address (used in switch/button write sequences)
 # ---------------------------------------------------------------------------
 DISPATCH_START_ADDR = 0x0880
