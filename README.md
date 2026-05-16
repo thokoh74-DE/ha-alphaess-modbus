@@ -490,6 +490,16 @@ Example Lovelace dashboard configurations are included in the [`examples/`](exam
 
 ## Changelog
 
+### v1.11.0
+- **fix:** Force Export now dynamically calculates battery discharge power from live house load and PV production so the grid sees the configured feed-in rate. Previously it sent the target directly as battery discharge power, ignoring house load and PV entirely.
+- **feat:** Force Export Hold added. Enabling it before starting Force Export keeps the dynamic export running indefinitely after the duration expires, matching the behaviour of Force Charging Hold and Force Import Hold.
+- **feat:** Smart Export removed. It provided the same dynamic continuous export that Force Export Hold now covers. Users who relied on Smart Export should switch to Force Export with Force Export Hold enabled.
+- **feat:** Poll speed presets (Slow, Normal, Fast) added to integration options. Slow reduces the Modbus transaction rate for RS485-to-TCP adapter users prone to timeouts. Fast halves poll intervals and tightens the coordinator loop to 1 s for faster SoC tracking and tighter dispatch control.
+- **feat:** Raw register write service (`alphaess_modbus.write_register`) added for advanced users. Writes any single register by address and integer value via Developer Tools or automations, with no scale or offset applied. Intended for grid safety and inverter configuration registers not exposed as standard entities.
+- **feat:** B3 and B3PLUS model variant option added to integration options. Selecting B3/B3PLUS applies the correct scale factors for the registers that differ from standard AlphaESS inverters (battery voltage, current, capacity, and related registers).
+- **feat:** Per-mode dispatch countdown sensors added: Force Charging Countdown, Force Discharging Countdown, Force Export Countdown, and Force Import Countdown. Each shows the remaining dispatch time only while its corresponding switch is active, and zero otherwise.
+- **docs:** Multi-inverter setup guide added to README explaining how to run two AlphaESS inverters simultaneously and distinguish their entities by renaming devices in Home Assistant.
+
 ### v1.10.0
 - **feat:** Dispatch PV Switch sensor is now enabled by default.
 - **feat:** Local IP, Subnet Mask, and Gateway sensors now display as dotted-decimal strings (e.g. `10.0.0.209`) instead of raw integers. IP Method shows `DHCP` or `Static`.
