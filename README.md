@@ -17,10 +17,10 @@ Based on the excellent YAML package by [Axel Koegler](https://projects.hillviewl
 - **94 sensor entities enabled by default** (159 total) — real-time power flows, battery SoC/SoH, cell voltages, temperatures, voltages, energy totals, dispatch diagnostics, grid safety parameters, faults & warnings
 - **Force Charging** — charge battery from grid at configurable power (kW), duration, and cutoff SoC
 - **Force Discharging** — discharge battery at configurable power, duration, and cutoff SoC; automatically stops 1% above the cutoff and resets dispatch so the inverter returns to self-consumption without any grid draw
-- **Force Export** — export battery to grid at configurable power, duration, and cutoff SoC; same zero-grid-draw auto-stop as Force Discharging
+- **Force Export** — export to grid at a target feed-in rate (kW); battery discharge is dynamically adjusted for live house load and PV so the grid sees the configured power; stops automatically when the duration expires or battery reaches the cutoff SoC
+- **Force Export Hold** — keeps Force Export running indefinitely after the duration expires; turn on before starting Force Export for continuous export without a time limit
 - **Force Import** — import from grid at a configurable target kW, dynamically adjusting battery charge to offset live PV so total grid draw stays at the target; stops at cutoff SoC
 - **Excess Export** — prioritise grid export over battery charging to reduce PV clipping; automatically pauses when the house starts drawing from the grid and resumes once PV recovers
-- **Smart Export** — dynamically exports up to a configurable max power, accounting for live house load and PV so grid export stays at the target without overloading the inverter
 - **Battery cell health** — min/max cell voltages polled every 60 s; charge/discharge cutoff voltages, module count, capacity, and type available as diagnostic sensors
 - **Dispatch diagnostics** — energy flow direction (human-readable), PV switch state, frequency dispatch flag, power, and frequency
 - **Charging / Discharging time periods** — configure up to two charge and discharge windows
@@ -76,10 +76,10 @@ Based on the excellent YAML package by [Axel Koegler](https://projects.hillviewl
 
 ## Poll Intervals
 
-Each sensor has a fixed poll interval hardcoded in the integration. The coordinator runs a 2-second master loop; contiguous registers due in the same cycle are batched into a single Modbus read. Individual registers are skipped when their own `scan_interval` hasn't elapsed yet.
+Each sensor has a base poll interval. The coordinator runs a master loop (2 s by default); contiguous registers due in the same cycle are batched into a single Modbus read. Individual registers are skipped when their own `scan_interval` hasn't elapsed yet. Actual intervals scale with the Poll Mode option (see [Poll Speed](#poll-speed) below).
 
-| Interval | Sensors |
-|----------|---------|
+| Base Interval | Sensors |
+|---------------|---------|
 | **1 s** | Grid Power, Battery Power, Active Power PV Meter, PV String 1–4 Power, PV Total Power *(disabled by default)* |
 | **5 s** | Grid Power Phase A/B/C, Grid Voltage Phase A/B/C, Inverter Work Mode, Inverter Power L1/L2/L3 + total, System Fault, Inverter Warning 1/2, Inverter Fault 1/2, Battery Warning/Fault, Max Feed to Grid, Dispatch registers (including Dispatch Energy Flow Direction, Freq Dispatch Flag), dispatch PV switch, freq dispatch power/frequency *(last two disabled by default)* |
 | **10 s** | Battery SoC, Battery SoH, Battery min/max cell temps, Battery max charge/discharge current, Charging Time Period Control, Charging Cutoff SoC |
@@ -87,7 +87,17 @@ Each sensor has a fixed poll interval hardcoded in the integration. The coordina
 | **60 s** | Inverter Temperature, Battery Voltage/Current/Status/Remaining Time, Battery min/max cell voltages, Battery relay status *(disabled)*, PV String Voltage & Current, Energy Totals, Version strings, SOC Calibration Enable *(disabled)*, Network settings *(disabled)* |
 | **300 s** | Battery charge/discharge cutoff voltages, Battery module count, Battery capacity, Battery type, SOC calibration cycle days *(all disabled by default)* |
 
-There is no user-configurable poll interval — intervals are tuned per-sensor to balance responsiveness against the inverter's one-connection limit.
+### Poll Speed
+
+The integration offers three poll speed presets, configurable via the integration's **Configure** button in Settings → Devices & Services:
+
+| Preset | Coordinator loop | Scan interval multiplier | Use case |
+|--------|-----------------|--------------------------|----------|
+| Slow | 2 s | 3.0 (configurable) | RS485 converters prone to timeouts; reduces Modbus transaction rate |
+| Normal | 2 s | 1.0 (fixed) | Default; suitable for wired LAN |
+| Fast | 1 s | 0.5 (configurable) | Tighter real-time control (Excess Export, SoC cutoffs); roughly doubles transaction rate |
+
+The Slow and Fast multipliers can be adjusted in the options form (range 0.25-10.0, step 0.25). Fast mode on low-spec hardware (Raspberry Pi 3 or similar) may impact Home Assistant performance due to the increased polling rate.
 
 ---
 
@@ -325,20 +335,20 @@ These are read-only sensor views of the scheduling registers. The writable equiv
 |--------|------|-------------|
 | Force Charging | Switch | Charge battery from grid at configured power/duration/cutoff SoC |
 | Force Discharging | Switch | Discharge battery at configured power/duration/cutoff SoC; auto-stops ~1% above cutoff to guarantee no grid draw during transition |
-| Force Export | Switch | Export to grid at configured power/duration/cutoff SoC; same zero-grid-draw auto-stop as Force Discharging |
+| Force Export | Switch | Export to grid at a target feed-in rate (kW); battery discharge dynamically adjusted for live house load and PV; stops when duration expires or battery hits cutoff SoC |
+| Force Export Hold | Switch | Keeps Force Export running indefinitely after the duration expires; turn on before starting Force Export for continuous export without a time limit |
 | Force Import | Switch | Import from grid at a target kW, dynamically adjusted for live PV so total grid draw stays at the target; stops at cutoff SoC |
 | Force Import Pause | Binary sensor | On when Force Import is automatically paused; resumes automatically when conditions are met |
 | Dispatch | Switch | Generic dispatch — mode, power, SoC target, and duration all configurable independently |
 | Excess Export | Switch | Maximise PV export, reduce clipping; auto-pauses when house draws from grid, auto-resumes when PV recovers |
 | Excess Export Pause | Binary sensor | On when Excess Export has automatically paused due to grid import |
-| Smart Export | Switch | Dynamically exports up to Max Export Power, adjusted for live house load and PV (re-fires every 30 s) |
 | Force Charging Power | Number | Charging power in kW (0–20) |
 | Force Charging Duration | Number | Duration in minutes (0–480, step 5) |
 | Force Charging Stop at SoC | Number | Stop charging at this SoC % |
 | Force Discharging Power | Number | Discharging power in kW (0–20) |
 | Force Discharging Duration | Number | Duration in minutes (0–480, step 5) |
 | Force Discharging Stop at SoC | Number | Stop discharging at this SoC % (switch auto-stops ~1% above this) |
-| Force Export Power | Number | Export power in kW (0–20) |
+| Force Export Power | Number | Target grid feed-in rate in kW (0–20); battery discharge is calculated dynamically to achieve this |
 | Force Export Duration | Number | Duration in minutes (0–480, step 5) |
 | Force Export Stop at SoC | Number | Stop exporting at this SoC % (switch auto-stops ~1% above this) |
 | Force Import Power | Number | Target grid import in kW (0–20) |
@@ -347,10 +357,9 @@ These are read-only sensor views of the scheduling registers. The writable equiv
 | Dispatch Power | Number | Dispatch power in kW (−20 to +20; negative = charge, positive = discharge/export); defaults to 0 kW |
 | Dispatch Duration | Number | Duration in minutes (0–480, step 5) |
 | Dispatch Stop at SoC | Number | SoC target % for the generic Dispatch switch |
-| Max Export Power | Number | Target grid export for Smart Export (kW) |
 | Dispatch Mode | Select | Operating mode for the generic Dispatch switch (Battery Only, SoC Control, Load Following, etc.) |
 | Charging / Discharging Settings | Select | Enable/disable time period control (Disable / Grid Charging / Discharge Time Control / Both) |
-| Inverter AC Limit | Select | Inverter AC output capacity (3–20 kW) — used by Excess Export and Smart Export to avoid overloading the inverter |
+| Inverter AC Limit | Select | Inverter AC output capacity (3–20 kW) — used by Excess Export to avoid overloading the inverter |
 | Max Feed to Grid | Number | Grid export limit (% of PV capacity) |
 | Charging Period 1 Start Time | Time | hh:mm — writes hour and minute registers independently |
 | Charging Period 1 Stop Time | Time | hh:mm |
