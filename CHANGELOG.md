@@ -1,5 +1,11 @@
 # Changelog
 
+### v1.11.0-beta.3
+- **fix:** Excess Export now correctly charges the battery when PV production exceeds the Inverter AC Limit, instead of always writing zero power.
+- **fix:** Excess Export auto-pause now fires immediately on a work-mode fault instead of waiting up to 15 seconds.
+- **fix:** Excess Export dispatch registers could be re-written after the switch was turned off if a resume was in progress; an `_is_on` guard prevents this.
+- **fix:** Excess Export now recalculates battery charge power when PV crosses the AC limit threshold during a running session, without waiting for the 4-minute refresh.
+
 ### v1.11.0-beta.2
 - **docs:** Unofficial integration disclaimer added to README.
 - **docs:** Fast Mode Poll Interval field label and descriptions updated to reflect that the value is a direct loop interval in seconds, not a multiplier.
