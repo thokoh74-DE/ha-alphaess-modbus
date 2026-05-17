@@ -501,6 +501,9 @@ Example Lovelace dashboard configurations are included in the [`examples/`](exam
 
 ## Changelog
 
+### v1.11.0-beta.2
+- **fix:** Fast mode poll floor removed. The coordinator loop interval now tracks the Fast Mode Interval Multiplier directly (e.g. 0.1 multiplier gives a 0.1 s loop), allowing sub-1 s polling for direct Modbus TCP connections. Previously the loop was hardcoded to 1 s in Fast mode, making multiplier values below 0.5 ineffective. Values below 0.25 are not recommended for RS485 adapter connections.
+
 ### v1.11.0-beta.1
 - **fix:** Force Export now dynamically calculates battery discharge power from live house load and PV production so the grid sees the configured feed-in rate. Previously it sent the target directly as battery discharge power, ignoring house load and PV entirely.
 - **feat:** Force Export Hold added. Enabling it before starting Force Export keeps the dynamic export running indefinitely after the duration expires, matching the behaviour of Force Charging Hold and Force Import Hold.

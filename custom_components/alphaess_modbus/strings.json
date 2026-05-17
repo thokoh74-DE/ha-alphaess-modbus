@@ -22,7 +22,7 @@
     "step": {
       "init": {
         "title": "Poll Speed",
-        "description": "Adjust how frequently the integration polls the inverter. Slow mode reduces transaction rate for RS485 adapters prone to timeouts. Fast mode halves scan intervals and reduces the coordinator loop to 1 s for tighter real-time control.",
+        "description": "Adjust how frequently the integration polls the inverter. Slow mode reduces transaction rate for RS485 adapters prone to timeouts. Fast mode shortens scan intervals and sets the coordinator loop to match the multiplier value.",
         "data": {
           "poll_mode": "Poll Mode",
           "slow_multiplier": "Slow Mode Interval Multiplier",
@@ -30,9 +30,9 @@
           "model_variant": "Inverter Model Variant"
         },
         "data_description": {
-          "poll_mode": "Slow (3x longer), Normal (default), or Fast (0.5x shorter). Fast mode also reduces the coordinator loop from 2 s to 1 s.",
+          "poll_mode": "Slow (3x longer), Normal (default), or Fast. In Fast mode the coordinator loop interval equals the multiplier value, so a 0.1 multiplier gives a 0.1 s loop.",
           "slow_multiplier": "Multiplier applied to all scan intervals in Slow mode (default 3.0, range 0.25-10.0).",
-          "fast_multiplier": "Multiplier applied to all scan intervals in Fast mode (default 0.5, range 0.25-10.0). Fast mode on low-spec hardware (Raspberry Pi 3 or similar) may impact Home Assistant performance.",
+          "fast_multiplier": "Multiplier applied to all scan intervals in Fast mode (default 0.5, range 0.1-10.0). The coordinator loop interval is set to this value, so 0.1 polls up to 10 times per second. Values below 0.25 are only recommended for direct Modbus TCP connections - RS485 adapters are unlikely to keep up and may cause timeouts.",
           "model_variant": "Select Standard for most inverters. Select SMILE-B3 / SMILE-B3-PLUS if your inverter is a SMILE-B3 or SMILE-B3-PLUS - these models use different scale factors for voltage and inverter power registers."
         }
       }

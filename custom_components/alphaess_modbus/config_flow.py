@@ -105,7 +105,7 @@ class AlphaESSOptionsFlowHandler(config_entries.OptionsFlow):
             ),
             vol.Required("fast_multiplier", default=float(fast_multiplier)): selector.NumberSelector(
                 selector.NumberSelectorConfig(
-                    min=0.25, max=10.0, step=0.25,
+                    min=0.1, max=10.0, step=0.1,
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),

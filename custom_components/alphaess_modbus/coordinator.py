@@ -94,7 +94,7 @@ class AlphaESSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             loop_interval = 2
         elif poll_mode == "fast":
             self._scan_multiplier = float(options.get("fast_multiplier", 0.5))
-            loop_interval = 1
+            loop_interval = self._scan_multiplier
         else:
             self._scan_multiplier = 1.0
             loop_interval = 2
