@@ -502,6 +502,7 @@ Example Lovelace dashboard configurations are included in the [`examples/`](exam
 ## Changelog
 
 ### v1.11.0-beta.2
+- **docs:** Unofficial integration disclaimer added to README.
 - **fix:** Fast mode poll floor removed. The coordinator loop interval now tracks the Fast Mode Interval Multiplier directly (e.g. 0.1 multiplier gives a 0.1 s loop), allowing sub-1 s polling for direct Modbus TCP connections. Previously the loop was hardcoded to 1 s in Fast mode, making multiplier values below 0.5 ineffective. Values below 0.25 are not recommended for RS485 adapter connections.
 
 ### v1.11.0-beta.1
