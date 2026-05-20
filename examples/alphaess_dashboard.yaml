@@ -128,6 +128,8 @@ views:
             entities:
               - entity: switch.alphaess_inverter_force_discharging
                 name: Enable
+              - entity: switch.alphaess_inverter_force_discharging_hold
+                name: Hold After Duration
               - type: section
               - entity: number.alphaess_inverter_force_discharging_power
                 name: Power (kW)
@@ -155,6 +157,8 @@ views:
             entities:
               - entity: switch.alphaess_inverter_force_export
                 name: Enable
+              - entity: switch.alphaess_inverter_force_export_hold
+                name: Hold After Duration
               - type: section
               - entity: number.alphaess_inverter_force_export_power
                 name: Power (kW)
@@ -162,18 +166,6 @@ views:
                 name: Duration (min)
               - entity: number.alphaess_inverter_force_export_cutoff_soc
                 name: Stop at SoC (%)
-
-          - type: entities
-            title: Smart Export
-            show_header_toggle: false
-            entities:
-              - entity: switch.alphaess_inverter_smart_export
-                name: Enable
-              - type: section
-              - entity: number.alphaess_inverter_max_export_power
-                name: Max Export (kW)
-              - entity: number.alphaess_inverter_force_export_cutoff_soc
-                name: SoC Floor (%)
 
           - type: entities
             title: Force Import
@@ -184,7 +176,7 @@ views:
                 name: Enable
               - entity: switch.alphaess_inverter_force_import_hold
                 name: Hold After Duration
-              - entity: switch.alphaess_inverter_force_import_pause
+              - entity: binary_sensor.alphaess_inverter_force_import_pause
                 name: Pause
               - type: section
               - entity: number.alphaess_inverter_force_import_power
