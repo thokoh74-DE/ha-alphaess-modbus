@@ -311,7 +311,7 @@ sections:
             name: PV Switch
           - entity: sensor.alphaess_inverter_dispatch_time
             name: Time Remaining
-          - entity: sensor.alphaess_inverter_dispatch_countdown
+          - entity: sensor.alphaess_inverter_dispatch_time_remaining
             name: Countdown
           - entity: sensor.alphaess_inverter_force_charging_countdown
             name: Force Charging Countdown
