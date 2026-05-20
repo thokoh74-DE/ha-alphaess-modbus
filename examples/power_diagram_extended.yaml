@@ -502,7 +502,7 @@ views:
               duration: 5min
             show:
               legend_value: false
-          - entity: sensor.alphaess_inverter_pv_string_1_power
+          - entity: sensor.alphaess_inverter_pv1_power
             float_precision: 2
             name: String 1
             yaxis_id: power
@@ -519,12 +519,46 @@ views:
               duration: 5min
             show:
               legend_value: false
-          - entity: sensor.alphaess_inverter_pv_string_2_power
+          - entity: sensor.alphaess_inverter_pv2_power
             float_precision: 2
             name: String 2
             yaxis_id: power
             type: area
             color: '#C18349'
+            unit: kW
+            transform: "return x / 1000;"
+            extend_to: now
+            curve: smooth
+            fill_raw: last
+            opacity: 0.5
+            group_by:
+              func: avg
+              duration: 5min
+            show:
+              legend_value: false
+          - entity: sensor.alphaess_inverter_pv3_power
+            float_precision: 2
+            name: String 3
+            yaxis_id: power
+            type: area
+            color: '#A0C770'
+            unit: kW
+            transform: "return x / 1000;"
+            extend_to: now
+            curve: smooth
+            fill_raw: last
+            opacity: 0.5
+            group_by:
+              func: avg
+              duration: 5min
+            show:
+              legend_value: false
+          - entity: sensor.alphaess_inverter_pv4_power
+            float_precision: 2
+            name: String 4
+            yaxis_id: power
+            type: area
+            color: '#9B59B6'
             unit: kW
             transform: "return x / 1000;"
             extend_to: now
