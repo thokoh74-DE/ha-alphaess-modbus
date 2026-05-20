@@ -1,5 +1,11 @@
 # Changelog
 
+### v1.11.0-beta.4
+- **fix:** Excess Export now recalculates battery charge power on every coordinator update (every 2 s) and rewrites the dispatch registers when power changes by 50 W or more, matching the cadence of the upstream automation. Previously power was only recalculated at the 4-minute refresh or when PV crossed the AC limit threshold.
+- **fix:** All four Force modes (Charging, Discharging, Export, Import) now stop automatically when battery power stays within +-50 W for 10 consecutive seconds. This replaces the SoC+1% fudge-factor approach and uses the inverter's natural signal that it has reached its SoC target. Force Charging and Force Import previously had no early-stop watcher at all.
+- **feat:** Force Discharging Hold added. Turn it on before starting Force Discharging to keep discharge running for the full configured duration instead of stopping early when the SoC target is reached.
+- **fix:** Hold switches (Force Charging Hold, Force Export Hold, Force Import Hold, Force Discharging Hold) no longer keep the inverter in an indefinite hold loop after the duration expires. They now only gate the battery power watcher: if Hold is on when the watcher would fire, the early stop is skipped and the dispatch runs out normally. The duration timer always stops the mode.
+
 ### v1.11.0-beta.3
 - **fix:** Excess Export now correctly charges the battery when PV production exceeds the Inverter AC Limit, instead of always writing zero power.
 - **fix:** Excess Export auto-pause now fires immediately on a work-mode fault instead of waiting up to 15 seconds.

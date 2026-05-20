@@ -50,8 +50,9 @@ _MUTEX_SWITCHES = [
 SWITCH_DEFS = [
     {"key": "force_charging",      "name": "Force Charging",       "icon": "mdi:battery-charging"},
     {"key": "force_charging_hold", "name": "Force Charging Hold",  "icon": "mdi:battery-lock"},
-    {"key": "force_discharging",   "name": "Force Discharging",    "icon": "mdi:battery-arrow-down"},
-    {"key": "force_export",        "name": "Force Export",         "icon": "mdi:transmission-tower-export"},
+    {"key": "force_discharging",      "name": "Force Discharging",      "icon": "mdi:battery-arrow-down"},
+    {"key": "force_discharging_hold", "name": "Force Discharging Hold", "icon": "mdi:battery-lock"},
+    {"key": "force_export",           "name": "Force Export",           "icon": "mdi:transmission-tower-export"},
     {"key": "force_export_hold",   "name": "Force Export Hold",    "icon": "mdi:transmission-tower-export"},
     {"key": "force_import",        "name": "Force Import",         "icon": "mdi:transmission-tower-import"},
     {"key": "force_import_hold",   "name": "Force Import Hold",    "icon": "mdi:battery-lock"},
@@ -59,7 +60,7 @@ SWITCH_DEFS = [
     {"key": "excess_export",       "name": "Excess Export",        "icon": "mdi:solar-power"},
 ]
 
-_HOLD_SWITCHES = {"force_charging_hold", "force_export_hold", "force_import_hold"}
+_HOLD_SWITCHES = {"force_charging_hold", "force_discharging_hold", "force_export_hold", "force_import_hold"}
 
 
 async def async_setup_entry(
@@ -103,7 +104,10 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         self._ee_last_pause_time: float = 0.0
         self._ee_last_resume_time: float = 0.0
         self._ee_work_mode_1_since: float | None = None
-        self._ee_above_limit: bool | None = None
+        self._ee_last_power_raw: int | None = None
+        self._ee_last_write_time: float = 0.0
+        # Battery power watcher state
+        self._bp_near_zero_since: float | None = None
 
     async def async_added_to_hass(self) -> None:
         state = await self.async_get_last_state()
@@ -147,6 +151,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         try:
             if self.switch_key == "force_charging":
                 await self._start_force_charging()
+                self._start_battery_power_watcher("force_charging_hold")
             elif self.switch_key == "force_discharging":
                 duration_min = self._num("force_discharging_duration", 120.0)
                 duration_s = int(duration_min * 60)
@@ -154,7 +159,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
                     raise ValueError("Force discharging duration is 0 — set number.alphaess_inverter_force_discharging_duration to a non-zero value")
                 await self._start_force_discharging(duration_s)
                 self._schedule_duration_off(duration_s)
-                self._start_soc_watcher("below", "force_discharging_cutoff_soc", 10.0)
+                self._start_battery_power_watcher("force_discharging_hold")
             elif self.switch_key == "force_export":
                 duration_min = self._num("force_export_duration", 120.0)
                 duration_s = int(duration_min * 60)
@@ -162,7 +167,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
                     raise ValueError("Force export duration is 0 — set number.alphaess_inverter_force_export_duration to a non-zero value")
                 await self._start_force_export(duration_s)
                 self._schedule_duration_off(duration_s)
-                self._start_soc_watcher("below", "force_export_cutoff_soc", 4.0)
+                self._start_battery_power_watcher("force_export_hold")
             elif self.switch_key == "force_import":
                 duration_min = self._num("force_import_duration", 120.0)
                 duration_s = int(duration_min * 60)
@@ -170,6 +175,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
                     raise ValueError("Force import duration is 0 — set number.alphaess_inverter_force_import_duration to a non-zero value")
                 await self._start_force_import(duration_s)
                 self._schedule_duration_off(duration_s)
+                self._start_battery_power_watcher("force_import_hold")
             elif self.switch_key == "dispatch":
                 await self._start_dispatch()
             elif self.switch_key == "excess_export":
@@ -214,7 +220,9 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         if self._ee_listener_unsub:
             self._ee_listener_unsub()
             self._ee_listener_unsub = None
-        self._ee_above_limit = None
+        self._ee_last_power_raw = None
+        self._ee_last_write_time = 0.0
+        self._bp_near_zero_since = None
 
     def _cancel_refresh_timer(self) -> None:
         if self._timer_cancel:
@@ -226,28 +234,11 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             self._duration_cancel.cancel()
         loop = self.hass.loop
 
-        async def _turn_off():
-            hold_key = None
-            if self.switch_key == "force_charging":
-                hold_key = "force_charging_hold"
-            elif self.switch_key == "force_export":
-                hold_key = "force_export_hold"
-            elif self.switch_key == "force_import":
-                hold_key = "force_import_hold"
-            if hold_key:
-                switches = self.hass.data[DOMAIN].get(f"{self._entry.entry_id}_switches", {})
-                hold_sw = switches.get(hold_key)
-                if hold_sw and hold_sw.is_on:
-                    if self.switch_key == "force_charging":
-                        await self._start_force_charging_hold()
-                    elif self.switch_key == "force_export":
-                        await self._start_force_export_hold()
-                    # force_import: refresh loop is already running — just don't stop
-                    return
-            await self._async_turn_off_silent()
-
         def _callback():
-            task = self.hass.async_create_task(_turn_off(), name=f"alphaess_{self.switch_key}_duration_off")
+            task = self.hass.async_create_task(
+                self._async_turn_off_silent(),
+                name=f"alphaess_{self.switch_key}_duration_off",
+            )
             self._pending_tasks.add(task)
             task.add_done_callback(self._pending_tasks.discard)
 
@@ -298,53 +289,51 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         self._is_on = True
         self.async_write_ha_state()
 
-    def _start_soc_watcher(self, direction: str, param_key: str, default: float) -> None:
-        """Watch soc_battery via coordinator and stop this switch when the cutoff is reached.
+    def _start_battery_power_watcher(self, hold_switch_key: str) -> None:
+        """Watch power_battery and stop this switch when it stays within +-50 W for 10 s.
 
-        Activates fast SOC sampling (2 s) while the watcher is alive.
-        direction='below': stop when soc <= cutoff  (discharge/export)
-        direction='above': stop when soc >= cutoff  (charge)
+        The 10-second window confirms the inverter has reached its SoC target naturally.
+        If the Hold switch is on when the window closes, the early stop is skipped and
+        the dispatch runs until the duration timer fires.
         """
         if self._soc_unsub:
-            # Already watching — unsubscribe first (decrements fast-SOC refcount).
             self._soc_unsub()
             self._soc_unsub = None
-
-        self._coordinator.set_fast_soc(True)
+        self._bp_near_zero_since = None
 
         def _check() -> None:
             if not self._is_on:
                 return
             data = self._coordinator.data or {}
-            soc = data.get("soc_battery")
-            if soc is None:
+            bp = data.get("power_battery")
+            if bp is None:
                 return
-            soc = float(soc)
-            cutoff = self._num(param_key, default)
-            # Stop 1% before the inverter's own internal limit so the dispatch
-            # is still active (battery still meets house load) while the reset
-            # is sent - this guarantees no grid draw during the transition.
-            triggered = (
-                (direction == "below" and soc <= cutoff + 1.0)
-                or (direction == "above" and soc >= cutoff - 1.0)
-            )
-            if not triggered:
-                return
-            unsub = self._soc_unsub
-            self._soc_unsub = None
-            if unsub:
-                unsub()  # decrements fast-SOC refcount via _combined_unsub
-            task = self.hass.async_create_task(self._async_turn_off_silent(), name=f"alphaess_{self.switch_key}_soc_off")
-            self._pending_tasks.add(task)
-            task.add_done_callback(self._pending_tasks.discard)
+            now = time.monotonic()
+            if abs(float(bp)) <= 50:
+                if self._bp_near_zero_since is None:
+                    self._bp_near_zero_since = now
+                elif now - self._bp_near_zero_since >= 10:
+                    switches = self.hass.data[DOMAIN].get(
+                        f"{self._entry.entry_id}_switches", {}
+                    )
+                    hold_sw = switches.get(hold_switch_key)
+                    if hold_sw and hold_sw.is_on:
+                        return
+                    self._bp_near_zero_since = None
+                    unsub = self._soc_unsub
+                    self._soc_unsub = None
+                    if unsub:
+                        unsub()
+                    task = self.hass.async_create_task(
+                        self._async_turn_off_silent(),
+                        name=f"alphaess_{self.switch_key}_bp_off",
+                    )
+                    self._pending_tasks.add(task)
+                    task.add_done_callback(self._pending_tasks.discard)
+            else:
+                self._bp_near_zero_since = None
 
-        raw_unsub = self._coordinator.async_add_listener(_check)
-
-        def _combined_unsub() -> None:
-            raw_unsub()
-            self._coordinator.set_fast_soc(False)
-
-        self._soc_unsub = _combined_unsub
+        self._soc_unsub = self._coordinator.async_add_listener(_check)
 
     # ------------------------------------------------------------------
     # Force Charging
@@ -370,36 +359,6 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         ])
         self._schedule_auto_off(duration_s)
 
-    async def _start_force_charging_hold(self) -> None:
-        """Neutral hold dispatch — keeps inverter in dispatch mode to prevent discharge."""
-        cutoff_soc = self._num("force_charging_cutoff_soc", 100.0)
-        soc_raw = int(cutoff_soc / DISPATCH_SOC_SCALE)
-        await self._coordinator.async_write_dispatch([
-            1, 0, 32000, 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, 60,
-        ])
-        self._schedule_force_charging_hold_refresh()
-
-    def _schedule_force_charging_hold_refresh(self) -> None:
-        self._cancel_refresh_timer()
-        loop = self.hass.loop
-
-        async def _refresh():
-            if not self._is_on:
-                return
-            switches = self.hass.data[DOMAIN].get(f"{self._entry.entry_id}_switches", {})
-            hold_sw = switches.get("force_charging_hold")
-            if hold_sw and hold_sw.is_on:
-                await self._start_force_charging_hold()
-            else:
-                await self._async_turn_off_silent()
-
-        def _callback():
-            task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_hold_refresh")
-            self._pending_tasks.add(task)
-            task.add_done_callback(self._pending_tasks.discard)
-
-        self._timer_cancel = loop.call_later(50, _callback)
-
     # ------------------------------------------------------------------
     # Force Discharging
     # ------------------------------------------------------------------
@@ -417,23 +376,6 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         await self._coordinator.async_write_dispatch([
             1, 0, power_raw, 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, duration_s,
         ])
-        self._schedule_force_discharging_refresh()
-
-    def _schedule_force_discharging_refresh(self) -> None:
-        self._cancel_refresh_timer()
-        loop = self.hass.loop
-
-        async def _refresh():
-            if not self._is_on:
-                return
-            await self._start_force_discharging(int(self._num("force_discharging_duration", 120.0) * 60))
-
-        def _callback():
-            task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_discharge_refresh")
-            self._pending_tasks.add(task)
-            task.add_done_callback(self._pending_tasks.discard)
-
-        self._timer_cancel = loop.call_later(50, _callback)
 
     # ------------------------------------------------------------------
     # Force Export
@@ -475,49 +417,6 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             task.add_done_callback(self._pending_tasks.discard)
 
         self._timer_cancel = loop.call_later(25, _callback)
-
-    async def _start_force_export_hold(self) -> None:
-        """Restart Force Export dispatch for a fresh 60 s window to keep it running indefinitely."""
-        d = self._coordinator.data or {}
-        soc = d.get("soc_battery")
-        cutoff_soc = self._num("force_export_cutoff_soc", 4.0)
-        if soc is not None and float(soc) <= cutoff_soc:
-            await self._async_turn_off_silent()
-            return
-        pv_production_w = _calc_pv_production(d)
-        house_load_w = _calc_house_load(d)
-        if house_load_w is None or pv_production_w is None:
-            self._schedule_force_export_hold_refresh()
-            return
-        target_export_w = int(self._num("force_export_power", 5.0) * 1000)
-        battery_discharge_w = max(0, target_export_w + int(house_load_w) - int(pv_production_w))
-        soc_raw = int(cutoff_soc / DISPATCH_SOC_SCALE)
-        power_raw = int(32000 + battery_discharge_w)
-        await self._coordinator.async_write_dispatch([
-            1, 0, power_raw, 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, 60,
-        ])
-        self._schedule_force_export_hold_refresh()
-
-    def _schedule_force_export_hold_refresh(self) -> None:
-        self._cancel_refresh_timer()
-        loop = self.hass.loop
-
-        async def _refresh():
-            if not self._is_on:
-                return
-            switches = self.hass.data[DOMAIN].get(f"{self._entry.entry_id}_switches", {})
-            hold_sw = switches.get("force_export_hold")
-            if hold_sw and hold_sw.is_on:
-                await self._start_force_export_hold()
-            else:
-                await self._async_turn_off_silent()
-
-        def _callback():
-            task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_hold_refresh")
-            self._pending_tasks.add(task)
-            task.add_done_callback(self._pending_tasks.discard)
-
-        self._timer_cancel = loop.call_later(50, _callback)
 
     # ------------------------------------------------------------------
     # Generic Dispatch
@@ -570,27 +469,9 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             1, 0, power_raw, 0, 32000,
             DISPATCH_MODE_SOC_CONTROL, 255, 0, 300,
         ])
-        self._schedule_excess_export_refresh()
+        self._ee_last_power_raw = power_raw
+        self._ee_last_write_time = time.monotonic()
         self._start_ee_watcher()
-
-    def _schedule_excess_export_refresh(self) -> None:
-        self._cancel_refresh_timer()
-        loop = self.hass.loop
-
-        async def _refresh():
-            if not self._is_on:
-                return
-            if self._coordinator.ee_paused:
-                self._schedule_excess_export_refresh()
-                return
-            await self._start_excess_export()
-
-        def _callback():
-            task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_ee_refresh")
-            self._pending_tasks.add(task)
-            task.add_done_callback(self._pending_tasks.discard)
-
-        self._timer_cancel = loop.call_later(240, _callback)
 
     def _start_ee_watcher(self) -> None:
         """Subscribe to coordinator updates to auto-pause/resume Excess Export.
@@ -612,11 +493,6 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             self._ee_work_mode_1_since = time.monotonic() - 600
         else:
             self._ee_work_mode_1_since = None
-
-        pv_total_init = _calc_pv_production(d)
-        if pv_total_init is not None:
-            pv_dc_init = pv_total_init - int(d.get("active_power_pv_meter", 0))
-            self._ee_above_limit = pv_dc_init > self._coordinator.ac_limit_w
 
         def _check() -> None:
             if not self._is_on:
@@ -641,7 +517,8 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
                 if should_pause_grid or should_pause_mode:
                     self._coordinator.ee_paused = True
                     self._ee_last_pause_time = now
-                    self._ee_above_limit = None
+                    self._ee_last_power_raw = None
+                    self._ee_last_write_time = 0.0
                     task = self.hass.async_create_task(
                         self._coordinator.async_reset_dispatch(),
                         name="alphaess_ee_auto_pause",
@@ -652,12 +529,19 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
                     pv_total = _calc_pv_production(d)
                     if pv_total is not None:
                         pv_dc = pv_total - int(d.get("active_power_pv_meter", 0))
-                        above = pv_dc > self._coordinator.ac_limit_w
-                        if above != self._ee_above_limit:
-                            self._ee_above_limit = above
+                        if pv_dc > self._coordinator.ac_limit_w:
+                            power_raw = max(0, 32000 - (pv_dc - self._coordinator.ac_limit_w))
+                        else:
+                            power_raw = 32000
+                        changed = (
+                            self._ee_last_power_raw is None
+                            or abs(power_raw - self._ee_last_power_raw) >= 50
+                        )
+                        stale = (now - self._ee_last_write_time) >= 240
+                        if changed or stale:
                             task = self.hass.async_create_task(
                                 self._start_excess_export(),
-                                name="alphaess_ee_regime_change",
+                                name="alphaess_ee_recalc",
                             )
                             self._pending_tasks.add(task)
                             task.add_done_callback(self._pending_tasks.discard)
@@ -679,11 +563,6 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
                 ):
                     self._coordinator.ee_paused = False
                     self._ee_last_resume_time = now
-                    if pv_total is not None:
-                        pv_dc = pv_total - int(d.get("active_power_pv_meter", 0))
-                        self._ee_above_limit = pv_dc > self._coordinator.ac_limit_w
-                    else:
-                        self._ee_above_limit = None
                     task = self.hass.async_create_task(
                         self._start_excess_export(),
                         name="alphaess_ee_auto_resume",

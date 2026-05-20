@@ -146,7 +146,7 @@ sections:
           - entity: switch.alphaess_inverter_force_charging
             name: Enable
           - entity: switch.alphaess_inverter_force_charging_hold
-            name: Hold After Duration
+            name: Run Full Duration
           - type: section
           - entity: number.alphaess_inverter_force_charging_power
             name: Power (kW)
@@ -163,7 +163,7 @@ sections:
           - entity: switch.alphaess_inverter_force_export
             name: Enable
           - entity: switch.alphaess_inverter_force_export_hold
-            name: Hold After Duration
+            name: Run Full Duration
           - type: section
           - entity: number.alphaess_inverter_force_export_power
             name: Target Export (kW)
@@ -179,6 +179,8 @@ sections:
         entities:
           - entity: switch.alphaess_inverter_force_discharging
             name: Enable
+          - entity: switch.alphaess_inverter_force_discharging_hold
+            name: Run Full Duration
           - type: section
           - entity: number.alphaess_inverter_force_discharging_power
             name: Power (kW)
@@ -207,7 +209,7 @@ sections:
           - entity: switch.alphaess_inverter_force_import
             name: Enable
           - entity: switch.alphaess_inverter_force_import_hold
-            name: Hold After Duration
+            name: Run Full Duration
           - entity: binary_sensor.alphaess_inverter_force_import_pause
             name: Pause
           - type: section

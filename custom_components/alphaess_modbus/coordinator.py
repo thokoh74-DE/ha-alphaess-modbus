@@ -15,10 +15,6 @@ from .modbus_client import AlphaESSModbusClient
 
 _LOGGER = logging.getLogger(__name__)
 
-# Fast SOC sampling rate (seconds) used while a SOC watcher is active.
-_SOC_FAST_INTERVAL = 2
-_SOC_BATTERY_KEY = "soc_battery"
-
 # Per-register scan intervals — used for stale-entry expiry.
 _SCAN_INTERVAL_MAP: dict[str, float] = {r.key: r.scan_interval for r in SENSOR_REGISTERS}
 
@@ -107,7 +103,6 @@ class AlphaESSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._model_variant: str = options.get("model_variant", "standard")
         self.client = client
         self._last_polled: dict[str, float] = {}
-        self._fast_soc_refcount: int = 0
         # Caches for number/select entity values — populated by those entities
         # so switch.py can read them without going through hass.states.
         self.numbers: dict[str, float] = {}
@@ -125,23 +120,9 @@ class AlphaESSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def get_select(self, key: str) -> str | None:
         return self.selects.get(key)
 
-    def set_fast_soc(self, enabled: bool) -> None:
-        """Increment or decrement the fast-SOC refcount.
-
-        While refcount > 0, soc_battery is sampled every 2 s instead of its
-        default 10 s interval. Multiple concurrent watchers coexist safely.
-        """
-        if enabled:
-            self._fast_soc_refcount += 1
-        else:
-            self._fast_soc_refcount = max(0, self._fast_soc_refcount - 1)
-
     def _is_due(self, reg: ModbusSensorDef) -> bool:
         last = self._last_polled.get(reg.key, 0.0)
-        if reg.key == _SOC_BATTERY_KEY and self._fast_soc_refcount > 0:
-            interval: float = _SOC_FAST_INTERVAL
-        else:
-            interval = reg.scan_interval * self._scan_multiplier
+        interval = reg.scan_interval * self._scan_multiplier
         return (time.monotonic() - last) >= interval
 
     async def _async_update_data(self) -> dict[str, Any]:
