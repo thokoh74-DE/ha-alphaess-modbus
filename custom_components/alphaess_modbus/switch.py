@@ -158,6 +158,8 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
                 if duration_s <= 0:
                     raise ValueError("Force discharging duration is 0 — set number.alphaess_inverter_force_discharging_duration to a non-zero value")
                 await self._start_force_discharging(duration_s)
+                if not self._is_on:
+                    return
                 self._schedule_duration_off(duration_s)
                 self._start_battery_power_watcher("force_discharging_hold")
             elif self.switch_key == "force_export":
@@ -166,6 +168,8 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
                 if duration_s <= 0:
                     raise ValueError("Force export duration is 0 — set number.alphaess_inverter_force_export_duration to a non-zero value")
                 await self._start_force_export(duration_s)
+                if not self._is_on:
+                    return
                 self._schedule_duration_off(duration_s)
                 self._start_battery_power_watcher("force_export_hold")
             elif self.switch_key == "force_import":
