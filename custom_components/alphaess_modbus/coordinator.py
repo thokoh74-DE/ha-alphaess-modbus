@@ -207,12 +207,13 @@ class AlphaESSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         return data
 
-    async def async_write_dispatch(self, values: list[int]) -> None:
+    async def async_write_dispatch(self, values: list[int], *, reset_timer: bool = True) -> None:
         from .const import DISPATCH_START_ADDR
         await self.client.write_registers(DISPATCH_START_ADDR, values)
         if values and values[0] == 1 and len(values) >= 9:
-            self.dispatch_started_at = datetime.now(timezone.utc)
-            self.dispatch_duration_s = int(values[8])
+            if reset_timer:
+                self.dispatch_started_at = datetime.now(timezone.utc)
+                self.dispatch_duration_s = int(values[8])
         else:
             self.dispatch_started_at = None
             self.dispatch_duration_s = 0

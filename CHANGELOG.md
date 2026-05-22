@@ -1,5 +1,10 @@
 # Changelog
 
+### v1.12.0-beta.3
+- **fix:** Force Charging, Discharging, Export, and Import countdown sensors now count down in real time. Previously they read a static hardware register that holds the initial duration and never decrements - the sensor showed a flat line for the whole session then dropped to 0.
+- **fix:** Force Export and Force Import periodic power recalculation (every 25 s) no longer resets the countdown timer. The countdown now runs from the start of the session instead of restarting every 25 s.
+- **fix:** All countdown sensors now display in minutes by default instead of raw seconds. Existing entities may continue to show seconds until the display unit is changed in entity settings.
+
 ### v1.12.0-beta.2
 - **fix:** Daily energy sensor entity IDs corrected. The apostrophe in "Today's" caused HA to slugify names to `today_s_*` instead of `today_*`. Sensors now use translation keys so IDs are `today_energy_feed_to_grid`, `today_pv_generation`, etc. Users upgrading from beta.1 should delete the old `today_s_*` entities from the entity registry after reloading.
 

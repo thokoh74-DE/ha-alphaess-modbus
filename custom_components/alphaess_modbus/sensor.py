@@ -12,6 +12,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -302,7 +303,9 @@ class AlphaESSEmsVersionSensor(AlphaESSCombinedSensor):
 
 class AlphaESSDispatchCountdownSensor(CoordinatorEntity[AlphaESSCoordinator], SensorEntity):
     _attr_has_entity_name = True
-    _attr_native_unit_of_measurement = "s"
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_suggested_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_suggested_display_precision = 0
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_translation_key = "dispatch_countdown"
@@ -339,14 +342,13 @@ class AlphaESSDispatchCountdownSensor(CoordinatorEntity[AlphaESSCoordinator], Se
 
 
 class AlphaESSModeCountdownSensor(CoordinatorEntity[AlphaESSCoordinator], SensorEntity):
-    """Countdown sensor for a specific dispatch mode (force charging/discharging/export/import).
-
-    Shows the live dispatch_time register value when that mode is active, zero otherwise.
-    """
+    """Countdown sensor for a specific dispatch mode (force charging/discharging/export/import)."""
     _attr_has_entity_name = True
-    _attr_native_unit_of_measurement = "s"
-    _attr_device_class = None
-    _attr_state_class = None
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_suggested_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_suggested_display_precision = 0
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(
         self,
@@ -363,13 +365,30 @@ class AlphaESSModeCountdownSensor(CoordinatorEntity[AlphaESSCoordinator], Sensor
         self._attr_translation_key = f"{switch_key}_countdown"
         self._attr_icon = icon
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
+        self._unsub: Callable | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._unsub = async_track_time_interval(self.hass, self._tick, timedelta(seconds=1))
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._unsub:
+            self._unsub()
+            self._unsub = None
+
+    async def _tick(self, _now: datetime) -> None:
+        self.async_write_ha_state()
 
     @property
-    def native_value(self) -> int:
+    def native_value(self) -> int | None:
         if self.coordinator.active_dispatch_key != self._switch_key:
-            return 0
-        dispatch_time = (self.coordinator.data or {}).get("dispatch_time", 0)
-        return int(dispatch_time)
+            return None
+        started = self.coordinator.dispatch_started_at
+        dur = self.coordinator.dispatch_duration_s
+        if started is None or dur <= 0:
+            return None
+        elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+        return max(0, int(dur - elapsed))
 
 
 class AlphaESSDailySensor(CoordinatorEntity[AlphaESSCoordinator], RestoreSensor):
