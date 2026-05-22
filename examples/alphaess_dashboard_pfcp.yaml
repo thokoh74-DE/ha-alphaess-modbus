@@ -335,6 +335,22 @@ sections:
         heading: Energy & System
 
       - type: entities
+        title: Today's Energy
+        entities:
+          - entity: sensor.alphaess_inverter_today_pv_generation
+            name: PV Generation
+          - entity: sensor.alphaess_inverter_today_energy_feed_to_grid
+            name: Feed to Grid
+          - entity: sensor.alphaess_inverter_today_energy_from_grid
+            name: From Grid
+          - entity: sensor.alphaess_inverter_today_battery_charged
+            name: Battery Charged
+          - entity: sensor.alphaess_inverter_today_battery_discharged
+            name: Battery Discharged
+          - entity: sensor.alphaess_inverter_today_battery_charged_from_grid
+            name: Grid -> Battery
+
+      - type: entities
         title: Lifetime Energy
         entities:
           - entity: sensor.alphaess_inverter_total_energy_from_pv

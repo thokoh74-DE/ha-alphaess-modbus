@@ -1090,6 +1090,20 @@ BUTTON_DESCRIPTIONS: dict[str, tuple[str, str]] = {
 }
 
 # ---------------------------------------------------------------------------
+# Daily energy sensor definitions
+# Each tuple: (key, name, source_key_in_coordinator_data)
+# source_key must be a key in SENSOR_REGISTERS with state_class="total_increasing"
+# ---------------------------------------------------------------------------
+DAILY_ENERGY_SENSORS: list[tuple[str, str, str]] = [
+    ("today_energy_feed_to_grid",       "Today's Energy Feed to Grid",         "total_energy_feed_to_grid_meter"),
+    ("today_energy_from_grid",          "Today's Energy from Grid",            "total_energy_consumption_from_grid_meter"),
+    ("today_pv_generation",             "Today's PV Generation",               "total_energy_from_pv"),
+    ("today_battery_charged",           "Today's Battery Charged",             "total_energy_charge_battery"),
+    ("today_battery_discharged",        "Today's Battery Discharged",          "total_energy_discharge_battery"),
+    ("today_battery_charged_from_grid", "Today's Battery Charged from Grid",   "total_energy_charge_battery_from_grid"),
+]
+
+# ---------------------------------------------------------------------------
 # B3 / B3PLUS model scale overrides
 # Source: integration_alpha_ess.yaml v10.5 (comments "X for SMILE-B3/SMILE-B3-PLUS")
 # B3 and B3PLUS share identical scales, so a single "b3" variant covers both.

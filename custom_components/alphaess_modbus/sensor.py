@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.components.sensor import (
+    RestoreSensor,
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
@@ -14,10 +15,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import async_track_time_change, async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, SENSOR_REGISTERS, ModbusSensorDef
+from .const import DAILY_ENERGY_SENSORS, DOMAIN, SENSOR_REGISTERS, ModbusSensorDef
 from .coordinator import AlphaESSCoordinator
 
 
@@ -147,6 +148,10 @@ async def async_setup_entry(
             ("force_export",      "Force Export Countdown",      "mdi:transmission-tower-export"),
             ("force_import",      "Force Import Countdown",      "mdi:transmission-tower-import"),
         ]
+    ]
+    entities += [
+        AlphaESSDailySensor(coordinator, entry, key, name, source_key)
+        for key, name, source_key in DAILY_ENERGY_SENSORS
     ]
     async_add_entities(entities)
 
@@ -365,3 +370,88 @@ class AlphaESSModeCountdownSensor(CoordinatorEntity[AlphaESSCoordinator], Sensor
             return 0
         dispatch_time = (self.coordinator.data or {}).get("dispatch_time", 0)
         return int(dispatch_time)
+
+
+class AlphaESSDailySensor(CoordinatorEntity[AlphaESSCoordinator], RestoreSensor):
+    """Daily energy sensor that resets at midnight using lifetime totals as a baseline."""
+
+    _attr_has_entity_name = True
+    _attr_native_unit_of_measurement = "kWh"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL
+
+    def __init__(
+        self,
+        coordinator: AlphaESSCoordinator,
+        entry: ConfigEntry,
+        key: str,
+        name: str,
+        source_key: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self._source_key = source_key
+        self._attr_unique_id = f"{entry.entry_id}_{key}"
+        self._attr_name = name
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
+        self._day_start_value: float | None = None
+        self._start_date: date | None = None
+        self._unsub_midnight: Callable | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+
+        today = date.today()
+        last_state = await self.async_get_last_state()
+        restored = False
+        if last_state and last_state.attributes:
+            saved_date_str = last_state.attributes.get("start_date")
+            saved_value = last_state.attributes.get("day_start_value")
+            if saved_date_str and saved_value is not None:
+                try:
+                    saved_date = date.fromisoformat(str(saved_date_str))
+                    if saved_date == today:
+                        self._day_start_value = float(saved_value)
+                        self._start_date = saved_date
+                        restored = True
+                except (ValueError, TypeError):
+                    pass
+
+        if not restored:
+            current = (self.coordinator.data or {}).get(self._source_key)
+            if current is not None:
+                self._day_start_value = float(current)
+                self._start_date = today
+
+        self._unsub_midnight = async_track_time_change(
+            self.hass, self._reset_day, hour=0, minute=0, second=0
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._unsub_midnight:
+            self._unsub_midnight()
+            self._unsub_midnight = None
+
+    async def _reset_day(self, _now: datetime) -> None:
+        current = (self.coordinator.data or {}).get(self._source_key)
+        if current is not None:
+            self._day_start_value = float(current)
+            self._start_date = date.today()
+            self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> float | None:
+        if self._day_start_value is None:
+            return None
+        current = (self.coordinator.data or {}).get(self._source_key)
+        if current is None:
+            return None
+        return round(max(0.0, float(current) - self._day_start_value), 2)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self._day_start_value is None:
+            return {}
+        return {
+            "day_start_value": self._day_start_value,
+            "start_date": self._start_date.isoformat() if self._start_date else None,
+        }

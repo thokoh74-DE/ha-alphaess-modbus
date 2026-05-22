@@ -1,5 +1,10 @@
 # Changelog
 
+### v1.12.0-beta.1
+- **feat:** Six daily energy sensors added: Today's Energy Feed to Grid, Today's Energy from Grid, Today's PV Generation, Today's Battery Charged, Today's Battery Discharged, and Today's Battery Charged from Grid. Each resets at midnight using the inverter's lifetime cumulative totals as a baseline. State is preserved across HA restarts.
+
+---
+
 ### v1.11.0
 - **feat:** Force Export Hold switch added. Enabling it before starting Force Export keeps the dynamic export running indefinitely after the duration expires.
 - **feat:** Force Discharging Hold switch added. Enabling it before starting Force Discharging keeps the session running for the full configured duration instead of stopping early when the SoC target is reached.
