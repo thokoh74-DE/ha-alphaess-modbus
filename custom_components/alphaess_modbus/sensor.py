@@ -150,8 +150,8 @@ async def async_setup_entry(
         ]
     ]
     entities += [
-        AlphaESSDailySensor(coordinator, entry, key, name, source_key)
-        for key, name, source_key in DAILY_ENERGY_SENSORS
+        AlphaESSDailySensor(coordinator, entry, key, source_key)
+        for key, source_key in DAILY_ENERGY_SENSORS
     ]
     async_add_entities(entities)
 
@@ -385,13 +385,12 @@ class AlphaESSDailySensor(CoordinatorEntity[AlphaESSCoordinator], RestoreSensor)
         coordinator: AlphaESSCoordinator,
         entry: ConfigEntry,
         key: str,
-        name: str,
         source_key: str,
     ) -> None:
         super().__init__(coordinator)
         self._source_key = source_key
         self._attr_unique_id = f"{entry.entry_id}_{key}"
-        self._attr_name = name
+        self._attr_translation_key = key
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
         self._day_start_value: float | None = None
         self._start_date: date | None = None

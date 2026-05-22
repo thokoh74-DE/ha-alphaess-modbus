@@ -1,5 +1,8 @@
 # Changelog
 
+### v1.12.0-beta.2
+- **fix:** Daily energy sensor entity IDs corrected. The apostrophe in "Today's" caused HA to slugify names to `today_s_*` instead of `today_*`. Sensors now use translation keys so IDs are `today_energy_feed_to_grid`, `today_pv_generation`, etc. Users upgrading from beta.1 should delete the old `today_s_*` entities from the entity registry after reloading.
+
 ### v1.12.0-beta.1
 - **feat:** Six daily energy sensors added: Today's Energy Feed to Grid, Today's Energy from Grid, Today's PV Generation, Today's Battery Charged, Today's Battery Discharged, and Today's Battery Charged from Grid. Each resets at midnight using the inverter's lifetime cumulative totals as a baseline. State is preserved across HA restarts.
 
