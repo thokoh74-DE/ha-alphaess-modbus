@@ -7,7 +7,7 @@ TODO.md
 integration_alpha_ess.yaml
 
 # Local reference docs (manufacturer PDFs, datasheets, etc.)
-docs/
+docs/*.pdf
 
 # Tests (local only, not published to HACS/GitHub)
 tests/
