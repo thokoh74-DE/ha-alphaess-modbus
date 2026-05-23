@@ -113,6 +113,8 @@ views:
                 name: Enable
               - entity: switch.alphaess_inverter_force_charging_hold
                 name: Hold After Duration
+              - entity: sensor.alphaess_inverter_force_charging_countdown
+                name: Countdown
               - type: section
               - entity: number.alphaess_inverter_force_charging_power
                 name: Power (kW)
@@ -128,6 +130,8 @@ views:
             entities:
               - entity: switch.alphaess_inverter_force_discharging
                 name: Enable
+              - entity: sensor.alphaess_inverter_force_discharging_countdown
+                name: Countdown
               - type: section
               - entity: number.alphaess_inverter_force_discharging_power
                 name: Power (kW)
@@ -155,6 +159,8 @@ views:
             entities:
               - entity: switch.alphaess_inverter_force_export
                 name: Enable
+              - entity: sensor.alphaess_inverter_force_export_countdown
+                name: Countdown
               - type: section
               - entity: number.alphaess_inverter_force_export_power
                 name: Power (kW)
@@ -186,6 +192,8 @@ views:
                 name: Hold After Duration
               - entity: switch.alphaess_inverter_force_import_pause
                 name: Pause
+              - entity: sensor.alphaess_inverter_force_import_countdown
+                name: Countdown
               - type: section
               - entity: number.alphaess_inverter_force_import_power
                 name: Import Power (kW)
