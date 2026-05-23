@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -151,8 +152,8 @@ async def async_setup_entry(
         ]
     ]
     entities += [
-        AlphaESSDailySensor(coordinator, entry, key, source_key)
-        for key, source_key in DAILY_ENERGY_SENSORS
+        AlphaESSDailySensor(coordinator, entry, key, source_key, ac_power_key)
+        for key, source_key, ac_power_key in DAILY_ENERGY_SENSORS
     ]
     async_add_entities(entities)
 
@@ -392,7 +393,12 @@ class AlphaESSModeCountdownSensor(CoordinatorEntity[AlphaESSCoordinator], Sensor
 
 
 class AlphaESSDailySensor(CoordinatorEntity[AlphaESSCoordinator], RestoreSensor):
-    """Daily energy sensor that resets at midnight using lifetime totals as a baseline."""
+    """Daily energy sensor that resets at midnight using lifetime totals as a baseline.
+
+    When ac_power_key is set, also integrates that live power register via Riemann
+    sum and adds the result to the DC register delta. This handles AC-coupled PV
+    inverters, which have no hardware energy counter in the AlphaESS register set.
+    """
 
     _attr_has_entity_name = True
     _attr_native_unit_of_measurement = "kWh"
@@ -405,15 +411,30 @@ class AlphaESSDailySensor(CoordinatorEntity[AlphaESSCoordinator], RestoreSensor)
         entry: ConfigEntry,
         key: str,
         source_key: str,
+        ac_power_key: str | None = None,
     ) -> None:
         super().__init__(coordinator)
         self._source_key = source_key
+        self._ac_power_key = ac_power_key
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_translation_key = key
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
         self._day_start_value: float | None = None
         self._start_date: date | None = None
         self._unsub_midnight: Callable | None = None
+        self._ac_accumulated_kwh: float = 0.0
+        self._last_ac_time: float | None = None
+
+    def _handle_coordinator_update(self) -> None:
+        if self._ac_power_key:
+            d = self.coordinator.data or {}
+            power_w = d.get(self._ac_power_key)
+            now = time.monotonic()
+            if power_w is not None and self._last_ac_time is not None:
+                elapsed_s = min(now - self._last_ac_time, 60.0)
+                self._ac_accumulated_kwh += max(0.0, float(power_w)) * elapsed_s / 3_600_000.0
+            self._last_ac_time = now
+        super()._handle_coordinator_update()
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -440,6 +461,14 @@ class AlphaESSDailySensor(CoordinatorEntity[AlphaESSCoordinator], RestoreSensor)
                 self._day_start_value = float(current)
                 self._start_date = today
 
+        if restored and self._ac_power_key and last_state and last_state.attributes:
+            saved_ac = last_state.attributes.get("ac_accumulated_kwh")
+            if saved_ac is not None:
+                try:
+                    self._ac_accumulated_kwh = float(saved_ac)
+                except (ValueError, TypeError):
+                    pass
+
         self._unsub_midnight = async_track_time_change(
             self.hass, self._reset_day, hour=0, minute=0, second=0
         )
@@ -454,7 +483,9 @@ class AlphaESSDailySensor(CoordinatorEntity[AlphaESSCoordinator], RestoreSensor)
         if current is not None:
             self._day_start_value = float(current)
             self._start_date = date.today()
-            self.async_write_ha_state()
+        self._ac_accumulated_kwh = 0.0
+        self._last_ac_time = None
+        self.async_write_ha_state()
 
     @property
     def native_value(self) -> float | None:
@@ -463,13 +494,17 @@ class AlphaESSDailySensor(CoordinatorEntity[AlphaESSCoordinator], RestoreSensor)
         current = (self.coordinator.data or {}).get(self._source_key)
         if current is None:
             return None
-        return round(max(0.0, float(current) - self._day_start_value), 2)
+        dc_kwh = max(0.0, float(current) - self._day_start_value)
+        return round(dc_kwh + self._ac_accumulated_kwh, 2)
 
     @property
     def extra_state_attributes(self) -> dict:
         if self._day_start_value is None:
             return {}
-        return {
+        attrs: dict = {
             "day_start_value": self._day_start_value,
             "start_date": self._start_date.isoformat() if self._start_date else None,
         }
+        if self._ac_power_key:
+            attrs["ac_accumulated_kwh"] = round(self._ac_accumulated_kwh, 4)
+        return attrs

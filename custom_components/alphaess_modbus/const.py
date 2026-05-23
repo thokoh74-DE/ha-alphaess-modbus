@@ -1091,16 +1091,18 @@ BUTTON_DESCRIPTIONS: dict[str, tuple[str, str]] = {
 
 # ---------------------------------------------------------------------------
 # Daily energy sensor definitions
-# Each tuple: (key, name, source_key_in_coordinator_data)
+# Each tuple: (key, source_key_in_coordinator_data, ac_power_key_or_None)
 # source_key must be a key in SENSOR_REGISTERS with state_class="total_increasing"
+# ac_power_key: if set, Riemann-integrates that live power register and adds
+# the accumulated kWh to the DC register delta (used for AC-coupled PV)
 # ---------------------------------------------------------------------------
-DAILY_ENERGY_SENSORS: list[tuple[str, str]] = [
-    ("today_energy_feed_to_grid",       "total_energy_feed_to_grid_meter"),
-    ("today_energy_from_grid",          "total_energy_consumption_from_grid_meter"),
-    ("today_pv_generation",             "total_energy_from_pv"),
-    ("today_battery_charged",           "total_energy_charge_battery"),
-    ("today_battery_discharged",        "total_energy_discharge_battery"),
-    ("today_battery_charged_from_grid", "total_energy_charge_battery_from_grid"),
+DAILY_ENERGY_SENSORS: list[tuple[str, str, str | None]] = [
+    ("today_energy_feed_to_grid",       "total_energy_feed_to_grid_meter",           None),
+    ("today_energy_from_grid",          "total_energy_consumption_from_grid_meter",  None),
+    ("today_pv_generation",             "total_energy_from_pv",                      "active_power_pv_meter"),
+    ("today_battery_charged",           "total_energy_charge_battery",               None),
+    ("today_battery_discharged",        "total_energy_discharge_battery",            None),
+    ("today_battery_charged_from_grid", "total_energy_charge_battery_from_grid",     None),
 ]
 
 # ---------------------------------------------------------------------------

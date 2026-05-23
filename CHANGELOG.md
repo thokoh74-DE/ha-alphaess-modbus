@@ -1,5 +1,8 @@
 # Changelog
 
+### v1.12.0-beta.4
+- **fix:** Today's PV Generation now includes energy from AC-coupled inverters. The hardware register used as the baseline only counts DC string PV; AC-coupled generation is now accumulated via a Riemann sum on the live AC PV meter reading and added to the daily total. The `ac_accumulated_kwh` attribute on the sensor shows the AC portion separately for verification.
+
 ### v1.12.0-beta.3
 - **fix:** Force Charging, Discharging, Export, and Import countdown sensors now count down in real time. Previously they read a static hardware register that holds the initial duration and never decrements - the sensor showed a flat line for the whole session then dropped to 0.
 - **fix:** Force Export and Force Import periodic power recalculation (every 25 s) no longer resets the countdown timer. The countdown now runs from the start of the session instead of restarting every 25 s.
