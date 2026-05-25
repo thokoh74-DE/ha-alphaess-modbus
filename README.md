@@ -21,12 +21,15 @@ Based on the excellent YAML package by [Axel Koegler](https://projects.hillviewl
 
 ## Features
 
-- **94 sensor entities enabled by default** (159 total) — real-time power flows, battery SoC/SoH, cell voltages, temperatures, voltages, energy totals, dispatch diagnostics, grid safety parameters, faults & warnings
+- **100 sensor entities enabled by default** (165 total) — real-time power flows, battery SoC/SoH, cell voltages, temperatures, voltages, energy totals, daily energy summaries, dispatch diagnostics, grid safety parameters, faults & warnings
 - **Force Charging** — charge battery from grid at configurable power (kW), duration, and cutoff SoC
+- **Force Charging Hold** — keeps Force Charging running indefinitely after the duration expires; turn on before starting Force Charging for continuous charging without a time limit
 - **Force Discharging** — discharge battery at configurable power, duration, and cutoff SoC; automatically stops 1% above the cutoff and resets dispatch so the inverter returns to self-consumption without any grid draw
+- **Force Discharging Hold** — keeps Force Discharging running for the full configured duration instead of stopping early when the SoC target is reached
 - **Force Export** — export to grid at a target feed-in rate (kW); battery discharge is dynamically adjusted for live house load and PV so the grid sees the configured power; stops automatically when the duration expires or battery reaches the cutoff SoC
 - **Force Export Hold** — keeps Force Export running indefinitely after the duration expires; turn on before starting Force Export for continuous export without a time limit
 - **Force Import** — import from grid at a configurable target kW, dynamically adjusting battery charge to offset live PV so total grid draw stays at the target; stops at cutoff SoC
+- **Force Import Hold** — keeps Force Import running indefinitely after the duration expires; turn on before starting Force Import for continuous importing without a time limit
 - **Excess Export** — charge the battery with PV power that would otherwise be clipped by the inverter AC output limit; automatically pauses when the house starts drawing from the grid and resumes once PV recovers
 - **Battery cell health** — min/max cell voltages polled every 60 s; charge/discharge cutoff voltages, module count, capacity, and type available as diagnostic sensors
 - **Dispatch diagnostics** — energy flow direction (human-readable), PV switch state, frequency dispatch flag, power, and frequency
@@ -233,6 +236,19 @@ These sensors have a 1 s `scan_interval` but the master loop runs at 2 s in Norm
 | Total Energy Discharge Battery | kWh | 60 s | Lifetime energy drawn from battery |
 | Total Energy Charge Battery from Grid | kWh | 60 s | Lifetime grid-to-battery energy |
 
+#### Daily Energy
+
+These sensors reset each day at midnight using the inverter's lifetime cumulative totals as a baseline. State is preserved across HA restarts. Today's PV Generation also accumulates AC-coupled inverter generation via a Riemann sum; the `ac_accumulated_kwh` attribute on that sensor shows the AC portion separately.
+
+| Entity | Unit | Description |
+|--------|------|-------------|
+| Today's Energy Feed to Grid | kWh | Energy exported to grid today |
+| Today's Energy from Grid | kWh | Energy imported from grid today |
+| Today's PV Generation | kWh | Total PV energy generated today (DC strings + AC-coupled) |
+| Today's Battery Charged | kWh | Energy delivered into battery today |
+| Today's Battery Discharged | kWh | Energy drawn from battery today |
+| Today's Battery Charged from Grid | kWh | Grid-to-battery energy today |
+
 #### Faults & Warnings
 
 | Entity | Unit | Poll | Description |
@@ -272,10 +288,10 @@ These sensors have a 1 s `scan_interval` but the master loop runs at 2 s in Norm
 | Dispatch PV Switch | - | 5 s | PV switch state during dispatch |
 | Freq Dispatch Power *(disabled)* | W | 5 s | Frequency dispatch power setpoint |
 | Freq Dispatch Frequency *(disabled)* | Hz | 5 s | Frequency dispatch trigger frequency |
-| Force Charging Countdown | s | 5 s | Live inverter remaining time when Force Charging is active; 0 otherwise |
-| Force Discharging Countdown | s | 5 s | Live inverter remaining time when Force Discharging is active; 0 otherwise |
-| Force Export Countdown | s | 5 s | Live inverter remaining time when Force Export is active; 0 otherwise |
-| Force Import Countdown | s | 5 s | Live inverter remaining time when Force Import is active; 0 otherwise |
+| Force Charging Countdown | min | 5 s | Live remaining time when Force Charging is active; 0 otherwise |
+| Force Discharging Countdown | min | 5 s | Live remaining time when Force Discharging is active; 0 otherwise |
+| Force Export Countdown | min | 5 s | Live remaining time when Force Export is active; 0 otherwise |
+| Force Import Countdown | min | 5 s | Live remaining time when Force Import is active; 0 otherwise |
 
 #### Scheduling — Charging / Discharging Periods
 
@@ -369,10 +385,13 @@ These are read-only sensor views of the scheduling registers. The writable equiv
 | Entity | Type | Description |
 |--------|------|-------------|
 | Force Charging | Switch | Charge battery from grid at configured power/duration/cutoff SoC |
+| Force Charging Hold | Switch | Keeps Force Charging running indefinitely after the duration expires; turn on before starting Force Charging |
 | Force Discharging | Switch | Discharge battery at configured power/duration/cutoff SoC; auto-stops ~1% above cutoff to guarantee no grid draw during transition |
+| Force Discharging Hold | Switch | Keeps Force Discharging running for the full configured duration; prevents early stop when the SoC target is reached |
 | Force Export | Switch | Export to grid at a target feed-in rate (kW); battery discharge dynamically adjusted for live house load and PV; stops when duration expires or battery hits cutoff SoC |
 | Force Export Hold | Switch | Keeps Force Export running indefinitely after the duration expires; turn on before starting Force Export for continuous export without a time limit |
 | Force Import | Switch | Import from grid at a target kW, dynamically adjusted for live PV so total grid draw stays at the target; stops at cutoff SoC |
+| Force Import Hold | Switch | Keeps Force Import running indefinitely after the duration expires; turn on before starting Force Import |
 | Force Import Pause | Binary sensor | On when Force Import is automatically paused; resumes automatically when conditions are met |
 | Dispatch | Switch | Generic dispatch — mode, power, SoC target, and duration all configurable independently |
 | Excess Export | Switch | Charge battery with PV power that would otherwise be clipped by the AC output limit; auto-pauses when house draws from grid, auto-resumes when PV recovers |
@@ -411,15 +430,13 @@ These are read-only sensor views of the scheduling registers. The writable equiv
 | Restart EMS | Button | Restart the Energy Management System |
 | Reset Energy Totals | Button | **WARNING: clears all lifetime energy counters on the inverter.** Use only if you have intentionally replaced the inverter or need to zero out the totals. |
 
-#### Extending a Running Dispatch Duration
+#### Changing Dispatch Parameters While Running
 
-To extend the duration of an active Force Charging, Force Discharging, Force Export, or Force Import session without interruption:
+You can adjust Power, SoC target, or Duration for an active Force Charging, Force Discharging, Force Export, or Force Import session without toggling the switch:
 
-1. Set the Duration number entity to the new total time you want (e.g. 120 min).
-2. Turn the switch off.
-3. Turn the switch on again.
+1. Change the relevant number slider (e.g. set Duration to 120 min).
 
-The integration immediately sends a fresh dispatch with the new duration. The per-mode countdown sensor reflects the new duration within the next 5 s poll.
+The integration immediately rewrites the dispatch registers with the updated values and restarts the countdown from the new duration. The per-mode countdown sensor reflects the change within the next 5 s poll.
 
 ---
 
