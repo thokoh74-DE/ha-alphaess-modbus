@@ -158,6 +158,24 @@
       },
       "force_import_countdown": {
         "name": "Force Import Countdown"
+      },
+      "today_energy_feed_to_grid": {
+        "name": "Today's Energy Feed to Grid"
+      },
+      "today_energy_from_grid": {
+        "name": "Today's Energy from Grid"
+      },
+      "today_pv_generation": {
+        "name": "Today's PV Generation"
+      },
+      "today_battery_charged": {
+        "name": "Today's Battery Charged"
+      },
+      "today_battery_discharged": {
+        "name": "Today's Battery Discharged"
+      },
+      "today_battery_charged_from_grid": {
+        "name": "Today's Battery Charged from Grid"
       }
     },
     "button": {

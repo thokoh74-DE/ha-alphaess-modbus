@@ -385,7 +385,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
     # Force Export
     # ------------------------------------------------------------------
 
-    async def _start_force_export(self, duration_s: int) -> None:
+    async def _start_force_export(self, duration_s: int, *, reset_timer: bool = True) -> None:
         d = self._coordinator.data or {}
         soc = d.get("soc_battery")
         cutoff_soc = self._num("force_export_cutoff_soc", 4.0)
@@ -403,7 +403,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         power_raw = int(32000 + battery_discharge_w)
         await self._coordinator.async_write_dispatch([
             1, 0, power_raw, 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, duration_s,
-        ])
+        ], reset_timer=reset_timer)
         self._schedule_force_export_refresh()
 
     def _schedule_force_export_refresh(self) -> None:
@@ -413,7 +413,10 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         async def _refresh():
             if not self._is_on:
                 return
-            await self._start_force_export(int(self._num("force_export_duration", 120.0) * 60))
+            await self._start_force_export(
+                int(self._num("force_export_duration", 120.0) * 60),
+                reset_timer=False,
+            )
 
         def _callback():
             task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_export_refresh")
@@ -580,7 +583,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
     # Force Import
     # ------------------------------------------------------------------
 
-    async def _start_force_import(self, duration_s: int) -> None:
+    async def _start_force_import(self, duration_s: int, *, reset_timer: bool = True) -> None:
         d = self._coordinator.data or {}
         pv_production_w = _calc_pv_production(d)
         house_load_w = _calc_house_load(d)
@@ -594,7 +597,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         power_raw = int(32000 - charge_power_w)
         await self._coordinator.async_write_dispatch([
             1, 0, power_raw, 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, duration_s,
-        ])
+        ], reset_timer=reset_timer)
         self._schedule_force_import_refresh()
 
     def _schedule_force_import_refresh(self) -> None:
@@ -607,7 +610,10 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             if self._coordinator.fi_paused:
                 self._schedule_force_import_refresh()
                 return
-            await self._start_force_import(int(self._num("force_import_duration", 120.0) * 60))
+            await self._start_force_import(
+                int(self._num("force_import_duration", 120.0) * 60),
+                reset_timer=False,
+            )
 
         def _callback():
             task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_import_refresh")

@@ -1,53 +1,60 @@
 # Changelog
 
+### v1.12.0
+
+#### What's new
+
+- Six daily energy sensors added: Today's PV Generation, Today's Energy Feed to Grid, Today's Energy from Grid, Today's Battery Charged, Today's Battery Discharged, and Today's Battery Charged from Grid. Each resets at midnight using the inverter's lifetime cumulative totals as a baseline. State is preserved across HA restarts.
+
+#### Bug fixes
+
+- Today's PV Generation now includes energy from AC-coupled inverters. The hardware register only counts DC string PV; AC-coupled generation is now accumulated via a Riemann sum on the live AC PV meter reading and added to the daily total. The `ac_accumulated_kwh` attribute on the sensor shows the AC portion separately for verification.
+- Daily energy sensor entity IDs corrected. The apostrophe in "Today's" caused HA to slugify names to `today_s_*` instead of `today_*`. Sensors now use translation keys so IDs are `today_energy_feed_to_grid`, `today_pv_generation`, etc. **Users upgrading from beta.1 should delete the old `today_s_*` entities from the entity registry after reloading the integration.**
+- Force Charging, Discharging, Export, and Import countdown sensors now count down in real time. Previously they read a static hardware register that holds the initial duration and never decrements.
+- Force Export and Force Import periodic power recalculation (every 25 s) no longer resets the countdown timer. The countdown now runs from the start of the session instead of restarting every 25 s.
+- All countdown sensors now display in minutes by default instead of raw seconds. Existing entities may need the display unit changed in entity settings.
+
+---
+
+### v1.12.0-beta.4
+- **fix:** Today's PV Generation now includes energy from AC-coupled inverters. The hardware register used as the baseline only counts DC string PV; AC-coupled generation is now accumulated via a Riemann sum on the live AC PV meter reading and added to the daily total. The `ac_accumulated_kwh` attribute on the sensor shows the AC portion separately for verification.
+
+### v1.12.0-beta.3
+- **fix:** Force Charging, Discharging, Export, and Import countdown sensors now count down in real time. Previously they read a static hardware register that holds the initial duration and never decrements - the sensor showed a flat line for the whole session then dropped to 0.
+- **fix:** Force Export and Force Import periodic power recalculation (every 25 s) no longer resets the countdown timer. The countdown now runs from the start of the session instead of restarting every 25 s.
+- **fix:** All countdown sensors now display in minutes by default instead of raw seconds. Existing entities may continue to show seconds until the display unit is changed in entity settings.
+
+### v1.12.0-beta.2
+- **fix:** Daily energy sensor entity IDs corrected. The apostrophe in "Today's" caused HA to slugify names to `today_s_*` instead of `today_*`. Sensors now use translation keys so IDs are `today_energy_feed_to_grid`, `today_pv_generation`, etc. Users upgrading from beta.1 should delete the old `today_s_*` entities from the entity registry after reloading.
+
+### v1.12.0-beta.1
+- **feat:** Six daily energy sensors added: Today's Energy Feed to Grid, Today's Energy from Grid, Today's PV Generation, Today's Battery Charged, Today's Battery Discharged, and Today's Battery Charged from Grid. Each resets at midnight using the inverter's lifetime cumulative totals as a baseline. State is preserved across HA restarts.
+
+---
+
 ### v1.11.0
-- **feat:** Force Export Hold switch added. Enabling it before starting Force Export keeps the dynamic export running indefinitely after the duration expires.
-- **feat:** Force Discharging Hold switch added. Enabling it before starting Force Discharging keeps the session running for the full configured duration instead of stopping early when the SoC target is reached.
-- **feat:** Smart Export removed. It provided the same continuous dynamic export that Force Export Hold now covers. Users who relied on Smart Export should switch to Force Export with Force Export Hold enabled.
-- **feat:** Poll speed presets (Slow, Normal, Fast) added to integration options. Slow reduces the Modbus transaction rate for RS485-to-TCP adapter users prone to timeouts. Fast halves poll intervals and tightens the coordinator loop for faster SoC tracking and tighter dispatch control.
-- **feat:** Raw register write service (`alphaess_modbus.write_register`) added for advanced users. Writes any single register by address and integer value via Developer Tools or automations, with no scale or offset applied.
-- **feat:** B3 and B3PLUS model variant option added to integration options. Selecting B3/B3PLUS applies the correct scale factors for registers that differ from standard AlphaESS inverters.
-- **feat:** Per-mode dispatch countdown sensors added: Force Charging Countdown, Force Discharging Countdown, Force Export Countdown, and Force Import Countdown. Each shows remaining dispatch time only while its switch is active.
-- **fix:** Force Export now dynamically calculates battery discharge power from live house load and PV production so the grid sees the configured feed-in rate. Previously it sent the target directly as battery discharge power, ignoring house load and PV entirely.
-- **fix:** Fast mode poll floor removed. The coordinator loop interval now tracks the Fast Mode Poll Interval directly, allowing sub-1 s polling for direct Modbus TCP connections. Previously the loop was hardcoded to 1 s in Fast mode.
-- **fix:** Excess Export power calculation corrected to charge the battery when PV production exceeds the Inverter AC Limit, instead of always writing zero power.
-- **fix:** Excess Export auto-pause now fires immediately on a work-mode fault instead of waiting up to 15 seconds.
-- **fix:** Excess Export now recalculates battery charge power on every coordinator update (every 2 s) and rewrites dispatch registers when power changes by 50 W or more, keeping pace with changing PV conditions.
-- **fix:** Excess Export dispatch registers could be re-written after the switch was turned off if a resume was in progress; an on-guard check now prevents this.
-- **fix:** All four Force modes (Charging, Discharging, Export, Import) now stop automatically when battery power stays within +/-50 W for 10 consecutive seconds, using the inverter's natural signal that it has reached its SoC target. Force Charging and Force Import previously had no early-stop watcher at all.
-- **fix:** Hold switches (Force Charging Hold, Force Export Hold, Force Import Hold, Force Discharging Hold) no longer keep the inverter in an indefinite hold loop after the duration expires. They now only gate the battery power watcher; the duration timer always stops the mode.
-- **fix:** Force Discharging and Force Export no longer schedule an orphan duration timer when SoC is already at or below the cutoff at startup. The orphan timer would call async_reset_dispatch hours later and could cancel an unrelated active dispatch.
 
-### v1.11.0-beta.5
-- **fix:** Force Discharging and Force Export no longer schedule an orphan duration timer when SoC is already at or below the cutoff at startup. The orphan timer would call async_reset_dispatch hours later and could cancel an unrelated active dispatch.
-- **fix:** Dispatch countdown entity ID corrected in the dashboard example.
+#### What's new
 
-### v1.11.0-beta.4
-- **fix:** Excess Export now recalculates battery charge power on every coordinator update (every 2 s) and rewrites the dispatch registers when power changes by 50 W or more, matching the cadence of the upstream automation. Previously power was only recalculated at the 4-minute refresh or when PV crossed the AC limit threshold.
-- **fix:** All four Force modes (Charging, Discharging, Export, Import) now stop automatically when battery power stays within +-50 W for 10 consecutive seconds. This replaces the SoC+1% fudge-factor approach and uses the inverter's natural signal that it has reached its SoC target. Force Charging and Force Import previously had no early-stop watcher at all.
-- **feat:** Force Discharging Hold added. Turn it on before starting Force Discharging to keep discharge running for the full configured duration instead of stopping early when the SoC target is reached.
-- **fix:** Hold switches (Force Charging Hold, Force Export Hold, Force Import Hold, Force Discharging Hold) no longer keep the inverter in an indefinite hold loop after the duration expires. They now only gate the battery power watcher: if Hold is on when the watcher would fire, the early stop is skipped and the dispatch runs out normally. The duration timer always stops the mode.
+- Force Export Hold switch added. Enabling it before starting Force Export keeps the dynamic export running indefinitely after the duration expires.
+- Force Discharging Hold switch added. Enabling it before starting Force Discharging keeps the session running for the full configured duration instead of stopping early when the SoC target is reached.
+- Smart Export removed. It provided the same continuous dynamic export that Force Export Hold now covers. Users who relied on Smart Export should switch to Force Export with Force Export Hold enabled.
+- Poll speed presets (Slow, Normal, Fast) added to integration options. Slow reduces the Modbus transaction rate for RS485-to-TCP adapter users prone to timeouts. Fast halves poll intervals and tightens the coordinator loop for faster SoC tracking and tighter dispatch control.
+- Raw register write service (`alphaess_modbus.write_register`) added for advanced users. Writes any single register by address and integer value via Developer Tools or automations, with no scale or offset applied.
+- B3 and B3PLUS model variant option added to integration options. Selecting B3/B3PLUS applies the correct scale factors for registers that differ from standard AlphaESS inverters.
+- Per-mode dispatch countdown sensors added: Force Charging Countdown, Force Discharging Countdown, Force Export Countdown, and Force Import Countdown. Each shows remaining dispatch time only while its switch is active.
 
-### v1.11.0-beta.3
-- **fix:** Excess Export now correctly charges the battery when PV production exceeds the Inverter AC Limit, instead of always writing zero power.
-- **fix:** Excess Export auto-pause now fires immediately on a work-mode fault instead of waiting up to 15 seconds.
-- **fix:** Excess Export dispatch registers could be re-written after the switch was turned off if a resume was in progress; an `_is_on` guard prevents this.
-- **fix:** Excess Export now recalculates battery charge power when PV crosses the AC limit threshold during a running session, without waiting for the 4-minute refresh.
+#### Bug fixes
 
-### v1.11.0-beta.2
-- **docs:** Unofficial integration disclaimer added to README.
-- **docs:** Fast Mode Poll Interval field label and descriptions updated to reflect that the value is a direct loop interval in seconds, not a multiplier.
-- **fix:** Fast mode poll floor removed. The coordinator loop interval now tracks the Fast Mode Poll Interval directly (e.g. 0.1 s gives a 100 ms loop), allowing sub-1 s polling for direct Modbus TCP connections. Previously the loop was hardcoded to 1 s in Fast mode, making values below 0.5 ineffective. Values below 0.25 are not recommended for RS485 adapter connections.
-
-### v1.11.0-beta.1
-- **fix:** Force Export now dynamically calculates battery discharge power from live house load and PV production so the grid sees the configured feed-in rate. Previously it sent the target directly as battery discharge power, ignoring house load and PV entirely.
-- **feat:** Force Export Hold added. Enabling it before starting Force Export keeps the dynamic export running indefinitely after the duration expires, matching the behaviour of Force Charging Hold and Force Import Hold.
-- **feat:** Smart Export removed. It provided the same dynamic continuous export that Force Export Hold now covers. Users who relied on Smart Export should switch to Force Export with Force Export Hold enabled.
-- **feat:** Poll speed presets (Slow, Normal, Fast) added to integration options. Slow reduces the Modbus transaction rate for RS485-to-TCP adapter users prone to timeouts. Fast halves poll intervals and tightens the coordinator loop to 1 s for faster SoC tracking and tighter dispatch control.
-- **feat:** Raw register write service (`alphaess_modbus.write_register`) added for advanced users. Writes any single register by address and integer value via Developer Tools or automations, with no scale or offset applied. Intended for grid safety and inverter configuration registers not exposed as standard entities.
-- **feat:** B3 and B3PLUS model variant option added to integration options. Selecting B3/B3PLUS applies the correct scale factors for the registers that differ from standard AlphaESS inverters (battery voltage, current, capacity, and related registers).
-- **feat:** Per-mode dispatch countdown sensors added: Force Charging Countdown, Force Discharging Countdown, Force Export Countdown, and Force Import Countdown. Each shows the remaining dispatch time only while its corresponding switch is active, and zero otherwise.
-- **docs:** Multi-inverter setup guide added to README explaining how to run two AlphaESS inverters simultaneously and distinguish their entities by renaming devices in Home Assistant.
+- Force Export now dynamically calculates battery discharge power from live house load and PV production so the grid sees the configured feed-in rate. Previously it sent the target directly as battery discharge power, ignoring house load and PV entirely.
+- Fast mode poll floor removed. The coordinator loop interval now tracks the Fast Mode Poll Interval directly, allowing sub-1 s polling for direct Modbus TCP connections. Previously the loop was hardcoded to 1 s in Fast mode.
+- Excess Export power calculation corrected to charge the battery when PV production exceeds the Inverter AC Limit, instead of always writing zero power.
+- Excess Export auto-pause now fires immediately on a work-mode fault instead of waiting up to 15 seconds.
+- Excess Export now recalculates battery charge power on every coordinator update (every 2 s) and rewrites dispatch registers when power changes by 50 W or more, keeping pace with changing PV conditions.
+- Excess Export dispatch registers could be re-written after the switch was turned off if a resume was in progress; an on-guard check now prevents this.
+- All four Force modes (Charging, Discharging, Export, Import) now stop automatically when battery power stays within +/-50 W for 10 consecutive seconds, using the inverter's natural signal that it has reached its SoC target. Force Charging and Force Import previously had no early-stop watcher at all.
+- Hold switches (Force Charging Hold, Force Export Hold, Force Import Hold, Force Discharging Hold) no longer keep the inverter in an indefinite hold loop after the duration expires. They now only gate the battery power watcher; the duration timer always stops the mode.
+- Force Discharging and Force Export no longer schedule an orphan duration timer when SoC is already at or below the cutoff at startup. The orphan timer would call async_reset_dispatch hours later and could cancel an unrelated active dispatch.
 
 ### v1.10.0
 - **feat:** Dispatch PV Switch sensor is now enabled by default.

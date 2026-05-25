@@ -1,23 +1,26 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.components.sensor import (
+    RestoreSensor,
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import async_track_time_change, async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, SENSOR_REGISTERS, ModbusSensorDef
+from .const import DAILY_ENERGY_SENSORS, DOMAIN, SENSOR_REGISTERS, ModbusSensorDef
 from .coordinator import AlphaESSCoordinator
 
 
@@ -147,6 +150,10 @@ async def async_setup_entry(
             ("force_export",      "Force Export Countdown",      "mdi:transmission-tower-export"),
             ("force_import",      "Force Import Countdown",      "mdi:transmission-tower-import"),
         ]
+    ]
+    entities += [
+        AlphaESSDailySensor(coordinator, entry, key, source_key, ac_power_key)
+        for key, source_key, ac_power_key in DAILY_ENERGY_SENSORS
     ]
     async_add_entities(entities)
 
@@ -297,7 +304,9 @@ class AlphaESSEmsVersionSensor(AlphaESSCombinedSensor):
 
 class AlphaESSDispatchCountdownSensor(CoordinatorEntity[AlphaESSCoordinator], SensorEntity):
     _attr_has_entity_name = True
-    _attr_native_unit_of_measurement = "s"
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_suggested_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_suggested_display_precision = 0
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_translation_key = "dispatch_countdown"
@@ -334,14 +343,13 @@ class AlphaESSDispatchCountdownSensor(CoordinatorEntity[AlphaESSCoordinator], Se
 
 
 class AlphaESSModeCountdownSensor(CoordinatorEntity[AlphaESSCoordinator], SensorEntity):
-    """Countdown sensor for a specific dispatch mode (force charging/discharging/export/import).
-
-    Shows the live dispatch_time register value when that mode is active, zero otherwise.
-    """
+    """Countdown sensor for a specific dispatch mode (force charging/discharging/export/import)."""
     _attr_has_entity_name = True
-    _attr_native_unit_of_measurement = "s"
-    _attr_device_class = None
-    _attr_state_class = None
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_suggested_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_suggested_display_precision = 0
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(
         self,
@@ -358,10 +366,145 @@ class AlphaESSModeCountdownSensor(CoordinatorEntity[AlphaESSCoordinator], Sensor
         self._attr_translation_key = f"{switch_key}_countdown"
         self._attr_icon = icon
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
+        self._unsub: Callable | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._unsub = async_track_time_interval(self.hass, self._tick, timedelta(seconds=1))
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._unsub:
+            self._unsub()
+            self._unsub = None
+
+    async def _tick(self, _now: datetime) -> None:
+        self.async_write_ha_state()
 
     @property
-    def native_value(self) -> int:
+    def native_value(self) -> int | None:
         if self.coordinator.active_dispatch_key != self._switch_key:
-            return 0
-        dispatch_time = (self.coordinator.data or {}).get("dispatch_time", 0)
-        return int(dispatch_time)
+            return None
+        started = self.coordinator.dispatch_started_at
+        dur = self.coordinator.dispatch_duration_s
+        if started is None or dur <= 0:
+            return None
+        elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+        return max(0, int(dur - elapsed))
+
+
+class AlphaESSDailySensor(CoordinatorEntity[AlphaESSCoordinator], RestoreSensor):
+    """Daily energy sensor that resets at midnight using lifetime totals as a baseline.
+
+    When ac_power_key is set, also integrates that live power register via Riemann
+    sum and adds the result to the DC register delta. This handles AC-coupled PV
+    inverters, which have no hardware energy counter in the AlphaESS register set.
+    """
+
+    _attr_has_entity_name = True
+    _attr_native_unit_of_measurement = "kWh"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL
+
+    def __init__(
+        self,
+        coordinator: AlphaESSCoordinator,
+        entry: ConfigEntry,
+        key: str,
+        source_key: str,
+        ac_power_key: str | None = None,
+    ) -> None:
+        super().__init__(coordinator)
+        self._source_key = source_key
+        self._ac_power_key = ac_power_key
+        self._attr_unique_id = f"{entry.entry_id}_{key}"
+        self._attr_translation_key = key
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
+        self._day_start_value: float | None = None
+        self._start_date: date | None = None
+        self._unsub_midnight: Callable | None = None
+        self._ac_accumulated_kwh: float = 0.0
+        self._last_ac_time: float | None = None
+
+    def _handle_coordinator_update(self) -> None:
+        if self._ac_power_key:
+            d = self.coordinator.data or {}
+            power_w = d.get(self._ac_power_key)
+            now = time.monotonic()
+            if power_w is not None and self._last_ac_time is not None:
+                elapsed_s = min(now - self._last_ac_time, 60.0)
+                self._ac_accumulated_kwh += max(0.0, float(power_w)) * elapsed_s / 3_600_000.0
+            self._last_ac_time = now
+        super()._handle_coordinator_update()
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+
+        today = date.today()
+        last_state = await self.async_get_last_state()
+        restored = False
+        if last_state and last_state.attributes:
+            saved_date_str = last_state.attributes.get("start_date")
+            saved_value = last_state.attributes.get("day_start_value")
+            if saved_date_str and saved_value is not None:
+                try:
+                    saved_date = date.fromisoformat(str(saved_date_str))
+                    if saved_date == today:
+                        self._day_start_value = float(saved_value)
+                        self._start_date = saved_date
+                        restored = True
+                except (ValueError, TypeError):
+                    pass
+
+        if not restored:
+            current = (self.coordinator.data or {}).get(self._source_key)
+            if current is not None:
+                self._day_start_value = float(current)
+                self._start_date = today
+
+        if restored and self._ac_power_key and last_state and last_state.attributes:
+            saved_ac = last_state.attributes.get("ac_accumulated_kwh")
+            if saved_ac is not None:
+                try:
+                    self._ac_accumulated_kwh = float(saved_ac)
+                except (ValueError, TypeError):
+                    pass
+
+        self._unsub_midnight = async_track_time_change(
+            self.hass, self._reset_day, hour=0, minute=0, second=0
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._unsub_midnight:
+            self._unsub_midnight()
+            self._unsub_midnight = None
+
+    async def _reset_day(self, _now: datetime) -> None:
+        current = (self.coordinator.data or {}).get(self._source_key)
+        if current is not None:
+            self._day_start_value = float(current)
+            self._start_date = date.today()
+        self._ac_accumulated_kwh = 0.0
+        self._last_ac_time = None
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> float | None:
+        if self._day_start_value is None:
+            return None
+        current = (self.coordinator.data or {}).get(self._source_key)
+        if current is None:
+            return None
+        dc_kwh = max(0.0, float(current) - self._day_start_value)
+        return round(dc_kwh + self._ac_accumulated_kwh, 2)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self._day_start_value is None:
+            return {}
+        attrs: dict = {
+            "day_start_value": self._day_start_value,
+            "start_date": self._start_date.isoformat() if self._start_date else None,
+        }
+        if self._ac_power_key:
+            attrs["ac_accumulated_kwh"] = round(self._ac_accumulated_kwh, 4)
+        return attrs
