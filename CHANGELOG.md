@@ -1,5 +1,9 @@
 # Changelog
 
+### v1.13.0-beta.2
+- **fix:** The Dispatch PV Enabled switch and the dispatch countdown now resolve correctly in the example dashboards; their entity IDs were wrong, which showed "Entity not found" on the Dispatch card.
+- **fix:** The write_register service no longer returns an error caused by internal data that is not a coordinator.
+
 ### v1.13.0-beta.1
 - **feat:** Dispatch PV Enabled switch added. Controls the inverter's PV coupling during dispatch via register 0x088A, so PV can be enabled or disabled for an active dispatch (useful for shedding solar during negative-price periods). Defaults to on (PV enabled). Toggling it while a dispatch is active writes the register immediately; otherwise the setting is applied on the next dispatch.
 - **change:** All dispatch writes now include the flow-direction and PV-switch registers, extending the dispatch block from 9 to 11 registers (0x0880 to 0x088A). The 1=on / 2=off mapping and standalone-write behaviour have not yet been confirmed on a real inverter.
