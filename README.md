@@ -31,6 +31,7 @@ Based on the excellent YAML package by [Axel Koegler](https://projects.hillviewl
 - **Force Import** — import from grid at a configurable target kW, dynamically adjusting battery charge to offset live PV so total grid draw stays at the target; stops at cutoff SoC
 - **Force Import Hold** — keeps Force Import running indefinitely after the duration expires; turn on before starting Force Import for continuous importing without a time limit
 - **Excess Export** — charge the battery with PV power that would otherwise be clipped by the inverter AC output limit; automatically pauses when the house starts drawing from the grid and resumes once PV recovers
+- **Dispatch PV Enabled** — enable or disable the inverter's PV coupling during an active dispatch (useful for shedding solar in negative-price periods); defaults to on (PV enabled). Toggling it while a dispatch is running applies immediately; otherwise it takes effect on the next dispatch
 - **Battery cell health** — min/max cell voltages polled every 60 s; charge/discharge cutoff voltages, module count, capacity, and type available as diagnostic sensors
 - **Dispatch diagnostics** — energy flow direction (human-readable), PV switch state, frequency dispatch flag, power, and frequency
 - **Charging / Discharging time periods** — configure up to two charge and discharge windows
@@ -396,6 +397,7 @@ These are read-only sensor views of the scheduling registers. The writable equiv
 | Dispatch | Switch | Generic dispatch — mode, power, SoC target, and duration all configurable independently |
 | Excess Export | Switch | Charge battery with PV power that would otherwise be clipped by the AC output limit; auto-pauses when house draws from grid, auto-resumes when PV recovers |
 | Excess Export Pause | Binary sensor | On when Excess Export has automatically paused due to grid import |
+| Dispatch PV Enabled | Switch | Enable (on, default) or disable (off) the inverter's PV coupling during dispatch via register 0x088A; toggling while a dispatch is active writes the register immediately, otherwise it applies on the next dispatch |
 | Force Charging Power | Number | Charging power in kW (0–20) |
 | Force Charging Duration | Number | Duration in minutes (0–480, step 5) |
 | Force Charging Stop at SoC | Number | Stop charging at this SoC % |
