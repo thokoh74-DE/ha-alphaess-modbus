@@ -12,7 +12,16 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN, DISPATCH_MODE_SOC_CONTROL, DISPATCH_SOC_SCALE
+from .const import (
+    DOMAIN,
+    DISPATCH_MODE_SOC_CONTROL,
+    DISPATCH_SOC_SCALE,
+    DISPATCH_FLOW_DIRECTION,
+    DISPATCH_PV_SWITCH_ADDR,
+    DISPATCH_PV_ON,
+    DISPATCH_PV_OFF,
+    DISPATCH_PV_UNCHANGED,
+)
 from .coordinator import AlphaESSCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -58,6 +67,7 @@ SWITCH_DEFS = [
     {"key": "force_import_hold",   "name": "Force Import Hold",    "icon": "mdi:battery-lock"},
     {"key": "dispatch",            "name": "Dispatch",             "icon": "mdi:button-pointer"},
     {"key": "excess_export",       "name": "Excess Export",        "icon": "mdi:solar-power"},
+    {"key": "dispatch_pv",         "name": "Dispatch PV Enabled",  "icon": "mdi:solar-power"},
 ]
 
 _HOLD_SWITCHES = {"force_charging_hold", "force_discharging_hold", "force_export_hold", "force_import_hold"}
@@ -111,7 +121,11 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
 
     async def async_added_to_hass(self) -> None:
         state = await self.async_get_last_state()
-        if state and state.state == "on":
+        if self.switch_key == "dispatch_pv":
+            # Persistent preference, not a dispatch. Default ON (PV enabled);
+            # restore the last known state across restarts.
+            self._is_on = True if state is None else state.state == "on"
+        elif state and state.state == "on":
             self._is_on = False  # Don't auto-resume dispatch on restart
         self.async_on_remove(
             self._coordinator.async_add_listener(self.async_write_ha_state)
@@ -133,6 +147,12 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         return self._is_on
 
     async def async_turn_on(self, **kwargs: Any) -> None:
+        if self.switch_key == "dispatch_pv":
+            self._is_on = True
+            self.async_write_ha_state()
+            await self._maybe_write_pv_switch(DISPATCH_PV_ON)
+            return
+
         if self.switch_key in _HOLD_SWITCHES:
             self._is_on = True
             self.async_write_ha_state()
@@ -190,6 +210,12 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
+        if self.switch_key == "dispatch_pv":
+            self._is_on = False
+            self.async_write_ha_state()
+            await self._maybe_write_pv_switch(DISPATCH_PV_OFF)
+            return
+
         if self.switch_key in _HOLD_SWITCHES:
             self._is_on = False
             self.async_write_ha_state()
@@ -265,6 +291,28 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
     def _num(self, key: str, default: float) -> float:
         v = self._coordinator.get_number(key)
         return v if v is not None else default
+
+    def _pv_switch_value(self) -> int:
+        """Return the PV switch register value (1 on / 2 off) for the dispatch block.
+
+        Reads the Dispatch PV Enabled switch from the shared switches map; defaults
+        to PV on when the switch is missing.
+        """
+        switches = self.hass.data[DOMAIN].get(f"{self._entry.entry_id}_switches", {})
+        pv_sw = switches.get("dispatch_pv")
+        return DISPATCH_PV_ON if (pv_sw is None or pv_sw.is_on) else DISPATCH_PV_OFF
+
+    async def _maybe_write_pv_switch(self, value: int) -> None:
+        """Apply a PV-switch change to 0x088A while a dispatch is active.
+
+        Mirrors upstream's AlphaESS_Update_Dispatch_PV_Switch automation: the
+        single-register write only takes effect during an active dispatch. Outside
+        an active dispatch the value is applied as part of the next dispatch fire.
+        Standalone-write behaviour is taken from upstream and is not yet confirmed
+        on a real inverter.
+        """
+        if self._coordinator.active_dispatch_key is not None:
+            await self._coordinator.async_write_register(DISPATCH_PV_SWITCH_ADDR, value)
 
     def _get_dispatch_mode(self) -> int:
         """Read the dispatch mode int from the coordinator select cache."""
@@ -360,6 +408,8 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             DISPATCH_MODE_SOC_CONTROL,
             soc_raw,
             0, duration_s,
+            DISPATCH_FLOW_DIRECTION,
+            DISPATCH_PV_UNCHANGED,
         ])
         self._schedule_auto_off(duration_s)
 
@@ -379,6 +429,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         power_raw = int(32000 + power_kw * 1000)
         await self._coordinator.async_write_dispatch([
             1, 0, power_raw, 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, duration_s,
+            DISPATCH_FLOW_DIRECTION, DISPATCH_PV_UNCHANGED,
         ])
 
     # ------------------------------------------------------------------
@@ -403,6 +454,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         power_raw = int(32000 + battery_discharge_w)
         await self._coordinator.async_write_dispatch([
             1, 0, power_raw, 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, duration_s,
+            DISPATCH_FLOW_DIRECTION, DISPATCH_PV_UNCHANGED,
         ], reset_timer=reset_timer)
         self._schedule_force_export_refresh()
 
@@ -452,6 +504,8 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             mode_val,
             soc_raw,
             0, duration_s,
+            DISPATCH_FLOW_DIRECTION,
+            self._pv_switch_value(),
         ])
         self._schedule_auto_off(duration_s)
 
@@ -475,6 +529,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         await self._coordinator.async_write_dispatch([
             1, 0, power_raw, 0, 32000,
             DISPATCH_MODE_SOC_CONTROL, 255, 0, 300,
+            DISPATCH_FLOW_DIRECTION, DISPATCH_PV_UNCHANGED,
         ])
         self._ee_last_power_raw = power_raw
         self._ee_last_write_time = time.monotonic()
@@ -597,6 +652,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         power_raw = int(32000 - charge_power_w)
         await self._coordinator.async_write_dispatch([
             1, 0, power_raw, 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, duration_s,
+            DISPATCH_FLOW_DIRECTION, DISPATCH_PV_UNCHANGED,
         ], reset_timer=reset_timer)
         self._schedule_force_import_refresh()
 

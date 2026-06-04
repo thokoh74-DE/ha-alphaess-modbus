@@ -10,7 +10,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from pymodbus.exceptions import ModbusException
 
-from .const import DOMAIN, SENSOR_REGISTERS, ModbusSensorDef, B3_SCALE_OVERRIDES
+from .const import (
+    DOMAIN,
+    SENSOR_REGISTERS,
+    ModbusSensorDef,
+    B3_SCALE_OVERRIDES,
+    DISPATCH_FLOW_DIRECTION,
+    DISPATCH_PV_UNCHANGED,
+)
 from .modbus_client import AlphaESSModbusClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -226,6 +233,8 @@ class AlphaESSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             0,      # Dispatch Mode
             0,      # Dispatch SoC
             0, 90,  # Dispatch Time (90 seconds)
+            DISPATCH_FLOW_DIRECTION,  # Flow Direction (0x0889)
+            DISPATCH_PV_UNCHANGED,    # PV Switch (0x088A): leave unchanged on stop
         ])
 
     async def async_write_register(self, address: int, value: int) -> None:

@@ -74,6 +74,9 @@
       },
       "force_import_hold": {
         "name": "Force Import Hold"
+      },
+      "dispatch_pv": {
+        "name": "Dispatch PV Enabled"
       }
     },
     "number": {

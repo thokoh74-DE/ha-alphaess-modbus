@@ -300,6 +300,8 @@ sections:
             name: Duration (min)
           - entity: number.alphaess_inverter_dispatch_cutoff_soc
             name: Stop at SoC (%)
+          - entity: switch.alphaess_inverter_dispatch_pv
+            name: PV Enabled
           - type: section
           - entity: button.alphaess_inverter_dispatch_reset
             name: Reset Dispatch

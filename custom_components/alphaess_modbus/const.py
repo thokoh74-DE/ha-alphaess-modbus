@@ -1149,6 +1149,17 @@ DISPATCH_START_ADDR = 0x0880
 DISPATCH_MODE_SOC_CONTROL = 2
 DISPATCH_SOC_SCALE = 0.392  # %/bit
 
+# Trailing dispatch-block registers (offsets 9 and 10 past DISPATCH_START_ADDR).
+# Flow Direction (0x0889) is hardcoded to 255 in every dispatch write upstream.
+# PV Switch (0x088A) is writable: 1 = PV on, 2 = PV off. Force modes write 0
+# (leave unchanged). The values and standalone-write behaviour are taken from the
+# upstream YAML and have not been confirmed on a real inverter.
+DISPATCH_FLOW_DIRECTION = 255
+DISPATCH_PV_SWITCH_ADDR = 0x088A
+DISPATCH_PV_ON = 1
+DISPATCH_PV_OFF = 2
+DISPATCH_PV_UNCHANGED = 0
+
 # Charging/discharging time period control register
 CHARGING_TIME_PERIOD_ADDR = 0x084F
 
