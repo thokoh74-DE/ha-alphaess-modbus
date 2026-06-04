@@ -305,11 +305,10 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
     async def _maybe_write_pv_switch(self, value: int) -> None:
         """Apply a PV-switch change to 0x088A while a dispatch is active.
 
-        Mirrors upstream's AlphaESS_Update_Dispatch_PV_Switch automation: the
-        single-register write only takes effect during an active dispatch. Outside
-        an active dispatch the value is applied as part of the next dispatch fire.
-        Standalone-write behaviour is taken from upstream and is not yet confirmed
-        on a real inverter.
+        The single-register write only takes effect during an active dispatch
+        (confirmed on real DC-coupled hardware). Outside an active dispatch the
+        value is applied as part of the next dispatch fire, and the inverter
+        restores PV to normal when the dispatch ends.
         """
         if self._coordinator.active_dispatch_key is not None:
             await self._coordinator.async_write_register(DISPATCH_PV_SWITCH_ADDR, value)
@@ -538,7 +537,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
     def _start_ee_watcher(self) -> None:
         """Subscribe to coordinator updates to auto-pause/resume Excess Export.
 
-        Mirrors upstream AlphaESS_Excess_Export_Pause / _Resume automations:
+        Auto-pause/resume rules for Excess Export:
         - Pause when power_grid > 50 W (importing) or inverter not in normal mode.
         - Resume when PV > 100 W, excess > 50 W or grid < -500 W, inverter in
           normal mode for >= 10 min, and >= 15 s since last pause.

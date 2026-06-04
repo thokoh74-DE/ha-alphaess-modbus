@@ -6,7 +6,7 @@
 
 ### v1.13.0-beta.1
 - **feat:** Dispatch PV Enabled switch added. Controls the inverter's PV coupling during dispatch via register 0x088A, so PV can be enabled or disabled for an active dispatch (useful for shedding solar during negative-price periods). Defaults to on (PV enabled). Toggling it while a dispatch is active writes the register immediately; otherwise the setting is applied on the next dispatch.
-- **change:** All dispatch writes now include the flow-direction and PV-switch registers, extending the dispatch block from 9 to 11 registers (0x0880 to 0x088A). The 1=on / 2=off mapping and standalone-write behaviour have not yet been confirmed on a real inverter.
+- **change:** All dispatch writes now include the flow-direction and PV-switch registers, extending the dispatch block from 9 to 11 registers (0x0880 to 0x088A). Confirmed on hardware: the PV switch only takes effect during an active dispatch, and the inverter restores PV to normal when the dispatch ends.
 - **upgrading from v1.12.0:** No entities are renamed or removed, so existing dashboards and automations are unaffected. The only new entity is the Dispatch PV Enabled switch, which defaults to on (PV stays enabled). Because the generic Dispatch now also sets the PV register, please report any unexpected PV behaviour during a dispatch.
 
 ---
