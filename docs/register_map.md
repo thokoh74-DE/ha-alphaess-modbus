@@ -263,7 +263,7 @@ Sensors are polled at the interval shown. Entries marked **off** in the Default 
 
 ## Writable Number Entities
 
-Numbers with an address write directly to a Modbus register when changed. Numbers with address **N/A** are dispatch parameters -- they are held in memory and assembled into the 9-register dispatch sequence when a switch is turned on.
+Numbers with an address write directly to a Modbus register when changed. Numbers with address **N/A** are dispatch parameters -- they are held in memory and assembled into the 11-register dispatch sequence when a switch is turned on.
 
 | Address | Key | Name | Description | Unit | Range | Step |
 |---------|-----|------|-------------|------|-------|------|
@@ -349,7 +349,7 @@ The six dispatch switches (Force Charging, Force Discharging, Force Export, Forc
 
 ## Dispatch Register Block
 
-The dispatch switches write 9 consecutive registers starting at **0x0880**. The active-power field uses a 32000-bias encoding: values below 32000 are charge (battery draw from grid/PV), values above 32000 are discharge (battery output to loads/grid).
+The dispatch switches write 11 consecutive registers starting at **0x0880**. The active-power field uses a 32000-bias encoding: values below 32000 are charge (battery draw from grid/PV), values above 32000 are discharge (battery output to loads/grid).
 
 | Offset | Address | Field | Encoding |
 |--------|---------|-------|----------|
@@ -362,3 +362,5 @@ The dispatch switches write 9 consecutive registers starting at **0x0880**. The 
 | 6 | 0x0886 | SoC | soc_percent / 0.392 (integer) |
 | 7 | 0x0887 | Time HI | Always 0 |
 | 8 | 0x0888 | Time LO | Duration in seconds |
+| 9 | 0x0889 | Flow Direction | Always 255 |
+| 10 | 0x088A | PV Switch | 1 = PV on, 2 = PV off, 0 = leave unchanged |
