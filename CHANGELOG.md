@@ -1,5 +1,8 @@
 # Changelog
 
+### v1.13.0-beta.3
+- **fix:** The IP Method diagnostic sensor no longer errors when enabled. It reports a text value (DHCP or Static) but was classed as a numeric measurement, which Home Assistant rejects. The sensor is disabled by default, so this only affects users who enabled it.
+
 ### v1.13.0-beta.2
 - **fix:** The Dispatch PV Enabled switch and the dispatch countdown now resolve correctly in the example dashboards; their entity IDs were wrong, which showed "Entity not found" on the Dispatch card.
 - **fix:** The write_register service no longer returns an error caused by internal data that is not a coordinator.
