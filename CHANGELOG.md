@@ -27,20 +27,6 @@
 
 ---
 
-### v1.13.0-beta.3
-- **fix:** The IP Method diagnostic sensor no longer errors when enabled. It reports a text value (DHCP or Static) but was classed as a numeric measurement, which Home Assistant rejects. The sensor is disabled by default, so this only affects users who enabled it.
-
-### v1.13.0-beta.2
-- **fix:** The Dispatch PV Enabled switch and the dispatch countdown now resolve correctly in the example dashboards; their entity IDs were wrong, which showed "Entity not found" on the Dispatch card.
-- **fix:** The write_register service no longer returns an error caused by internal data that is not a coordinator.
-
-### v1.13.0-beta.1
-- **feat:** Dispatch PV Enabled switch added. Controls the inverter's PV coupling during dispatch via register 0x088A, so PV can be enabled or disabled for an active dispatch (useful for shedding solar during negative-price periods). Defaults to on (PV enabled). Toggling it while a dispatch is active writes the register immediately; otherwise the setting is applied on the next dispatch.
-- **change:** All dispatch writes now include the flow-direction and PV-switch registers, extending the dispatch block from 9 to 11 registers (0x0880 to 0x088A). Confirmed on hardware: the PV switch only takes effect during an active dispatch, and the inverter restores PV to normal when the dispatch ends.
-- **upgrading from v1.12.0:** No entities are renamed or removed, so existing dashboards and automations are unaffected. The only new entity is the Dispatch PV Enabled switch, which defaults to on (PV stays enabled). Because the generic Dispatch now also sets the PV register, please report any unexpected PV behaviour during a dispatch.
-
----
-
 ### v1.12.0
 
 #### What's new
@@ -54,22 +40,6 @@
 - Force Charging, Discharging, Export, and Import countdown sensors now count down in real time. Previously they read a static hardware register that holds the initial duration and never decrements.
 - Force Export and Force Import periodic power recalculation (every 25 s) no longer resets the countdown timer. The countdown now runs from the start of the session instead of restarting every 25 s.
 - All countdown sensors now display in minutes by default instead of raw seconds. Existing entities may need the display unit changed in entity settings.
-
----
-
-### v1.12.0-beta.4
-- **fix:** Today's PV Generation now includes energy from AC-coupled inverters. The hardware register used as the baseline only counts DC string PV; AC-coupled generation is now accumulated via a Riemann sum on the live AC PV meter reading and added to the daily total. The `ac_accumulated_kwh` attribute on the sensor shows the AC portion separately for verification.
-
-### v1.12.0-beta.3
-- **fix:** Force Charging, Discharging, Export, and Import countdown sensors now count down in real time. Previously they read a static hardware register that holds the initial duration and never decrements - the sensor showed a flat line for the whole session then dropped to 0.
-- **fix:** Force Export and Force Import periodic power recalculation (every 25 s) no longer resets the countdown timer. The countdown now runs from the start of the session instead of restarting every 25 s.
-- **fix:** All countdown sensors now display in minutes by default instead of raw seconds. Existing entities may continue to show seconds until the display unit is changed in entity settings.
-
-### v1.12.0-beta.2
-- **fix:** Daily energy sensor entity IDs corrected. The apostrophe in "Today's" caused HA to slugify names to `today_s_*` instead of `today_*`. Sensors now use translation keys so IDs are `today_energy_feed_to_grid`, `today_pv_generation`, etc. Users upgrading from beta.1 should delete the old `today_s_*` entities from the entity registry after reloading.
-
-### v1.12.0-beta.1
-- **feat:** Six daily energy sensors added: Today's Energy Feed to Grid, Today's Energy from Grid, Today's PV Generation, Today's Battery Charged, Today's Battery Discharged, and Today's Battery Charged from Grid. Each resets at midnight using the inverter's lifetime cumulative totals as a baseline. State is preserved across HA restarts.
 
 ---
 
