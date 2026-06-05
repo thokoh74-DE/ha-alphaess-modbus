@@ -57,6 +57,9 @@
       "force_discharging": {
         "name": "Force Discharging"
       },
+      "force_discharging_hold": {
+        "name": "Force Discharging Hold"
+      },
       "force_export": {
         "name": "Force Export"
       },
