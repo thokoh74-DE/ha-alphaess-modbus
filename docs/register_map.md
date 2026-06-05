@@ -325,9 +325,9 @@ The six dispatch switches (Force Charging, Force Discharging, Force Export, Forc
 | `force_charging_hold` | Force Charging Hold | Prevents Force Charging from auto-stopping when battery power nears zero; useful when the inverter reduces charging before reaching the SoC target |
 | `force_discharging` | Force Discharging | Discharges the battery at the configured power level; stops at the cutoff SoC or after the duration |
 | `force_discharging_hold` | Force Discharging Hold | Prevents Force Discharging from auto-stopping when battery power nears zero |
-| `force_export` | Force Export | Exports power to the grid at the configured level; dynamically adjusts battery dispatch to account for live house load and PV production, refreshing every 25 seconds |
+| `force_export` | Force Export | Exports power to the grid at the configured level; dynamically adjusts battery dispatch to account for live house load and PV production, updating within a poll cycle whenever they change |
 | `force_export_hold` | Force Export Hold | Prevents Force Export from auto-stopping when battery power nears zero |
-| `force_import` | Force Import | Charges the battery using grid import at the configured level; accounts for live house load and PV, refreshing every 25 seconds |
+| `force_import` | Force Import | Charges the battery using grid import at the configured level; accounts for live house load and PV, updating within a poll cycle whenever they change |
 | `force_import_hold` | Force Import Hold | Prevents Force Import from auto-stopping when battery power nears zero |
 | `dispatch` | Dispatch | Sends a generic dispatch command with the configured power, mode, SoC target, and duration |
 | `excess_export` | Excess Export | Exports battery power equal to DC PV clipping (DC PV output minus inverter AC capacity); auto-pauses when importing from grid and resumes when conditions allow |

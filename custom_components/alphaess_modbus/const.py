@@ -1035,7 +1035,7 @@ SWITCH_DESCRIPTIONS: dict[str, tuple[str, str]] = {
     "force_export": (
         "Force Export",
         "Exports power to the grid at the configured level; dynamically adjusts battery dispatch to account "
-        "for live house load and PV production, refreshing every 25 seconds",
+        "for live house load and PV production, updating within a poll cycle whenever they change",
     ),
     "force_export_hold": (
         "Force Export Hold",
@@ -1044,7 +1044,7 @@ SWITCH_DESCRIPTIONS: dict[str, tuple[str, str]] = {
     "force_import": (
         "Force Import",
         "Charges the battery using grid import at the configured level; accounts for live house load and PV, "
-        "refreshing every 25 seconds",
+        "updating within a poll cycle whenever they change",
     ),
     "force_import_hold": (
         "Force Import Hold",

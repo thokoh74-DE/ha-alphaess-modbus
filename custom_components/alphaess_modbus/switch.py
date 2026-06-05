@@ -26,6 +26,16 @@ from .coordinator import AlphaESSCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+# Force Export / Force Import event-driven rewrite tuning.
+# The dispatch setpoint is recomputed on every coordinator update (~2 s poll) and
+# rewritten only when the computed active-power word moves by at least this many
+# watts, or when this many seconds have elapsed since the last write (drift/liveness
+# fallback). This replaces the old fixed 25 s refresh so load changes are tracked
+# within one poll cycle instead of up to 25 s, which prevents grid import at low
+# export/import power settings.
+_DISPATCH_REWRITE_THRESHOLD_W = 50
+_DISPATCH_STALE_REWRITE_S = 60
+
 
 def _calc_pv_production(data: dict) -> int | None:
     keys = ["pv1_power", "pv2_power", "pv3_power", "pv4_power", "active_power_pv_meter"]
@@ -116,6 +126,14 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         self._ee_work_mode_1_since: float | None = None
         self._ee_last_power_raw: int | None = None
         self._ee_last_write_time: float = 0.0
+        # Force Export event-driven watcher state
+        self._fe_listener_unsub: Any | None = None
+        self._fe_last_power_raw: int | None = None
+        self._fe_last_write_time: float = 0.0
+        # Force Import event-driven watcher state
+        self._fi_listener_unsub: Any | None = None
+        self._fi_last_power_raw: int | None = None
+        self._fi_last_write_time: float = 0.0
         # Battery power watcher state
         self._bp_near_zero_since: float | None = None
 
@@ -250,14 +268,19 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         if self._ee_listener_unsub:
             self._ee_listener_unsub()
             self._ee_listener_unsub = None
+        if self._fe_listener_unsub:
+            self._fe_listener_unsub()
+            self._fe_listener_unsub = None
+        if self._fi_listener_unsub:
+            self._fi_listener_unsub()
+            self._fi_listener_unsub = None
         self._ee_last_power_raw = None
         self._ee_last_write_time = 0.0
+        self._fe_last_power_raw = None
+        self._fe_last_write_time = 0.0
+        self._fi_last_power_raw = None
+        self._fi_last_write_time = 0.0
         self._bp_near_zero_since = None
-
-    def _cancel_refresh_timer(self) -> None:
-        if self._timer_cancel:
-            self._timer_cancel.cancel()
-            self._timer_cancel = None
 
     def _schedule_duration_off(self, duration_seconds: int) -> None:
         if self._duration_cancel:
@@ -435,6 +458,20 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
     # Force Export
     # ------------------------------------------------------------------
 
+    def _compute_force_export_power_raw(self, d: dict) -> int | None:
+        """Return the dispatch active-power word for Force Export, or None if PV/load unavailable.
+
+        battery_discharge = target_export + house_load - pv (floored at 0); the word is
+        the 32000-offset discharge power written at dispatch offset 2.
+        """
+        pv_production_w = _calc_pv_production(d)
+        house_load_w = _calc_house_load(d)
+        if house_load_w is None or pv_production_w is None:
+            return None
+        target_export_w = int(self._num("force_export_power", 5.0) * 1000)
+        battery_discharge_w = max(0, target_export_w + int(house_load_w) - int(pv_production_w))
+        return int(32000 + battery_discharge_w)
+
     async def _start_force_export(self, duration_s: int, *, reset_timer: bool = True) -> None:
         d = self._coordinator.data or {}
         soc = d.get("soc_battery")
@@ -442,39 +479,65 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         if soc is not None and float(soc) <= cutoff_soc:
             await self._async_turn_off_silent()
             return
-        pv_production_w = _calc_pv_production(d)
-        house_load_w = _calc_house_load(d)
-        if house_load_w is None or pv_production_w is None:
-            self._schedule_force_export_refresh()
+        power_raw = self._compute_force_export_power_raw(d)
+        if power_raw is None:
+            # PV/load not yet available; the watcher retries on the next update.
+            self._start_force_export_watcher(duration_s)
             return
-        target_export_w = int(self._num("force_export_power", 5.0) * 1000)
-        battery_discharge_w = max(0, target_export_w + int(house_load_w) - int(pv_production_w))
         soc_raw = int(cutoff_soc / DISPATCH_SOC_SCALE)
-        power_raw = int(32000 + battery_discharge_w)
         await self._coordinator.async_write_dispatch([
             1, 0, power_raw, 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, duration_s,
             DISPATCH_FLOW_DIRECTION, DISPATCH_PV_UNCHANGED,
         ], reset_timer=reset_timer)
-        self._schedule_force_export_refresh()
+        self._fe_last_power_raw = power_raw
+        self._fe_last_write_time = time.monotonic()
+        self._start_force_export_watcher(duration_s)
 
-    def _schedule_force_export_refresh(self) -> None:
-        self._cancel_refresh_timer()
-        loop = self.hass.loop
+    def _start_force_export_watcher(self, duration_s: int) -> None:
+        """Recompute the Force Export setpoint on each coordinator update.
 
-        async def _refresh():
+        Rewrites the dispatch when the computed active-power word moves by at least
+        _DISPATCH_REWRITE_THRESHOLD_W, or every _DISPATCH_STALE_REWRITE_S as a drift
+        fallback. Rewrites use reset_timer=False so the duration countdown is preserved.
+        """
+        if self._fe_listener_unsub is not None:
+            return
+
+        def _check() -> None:
             if not self._is_on:
                 return
-            await self._start_force_export(
-                int(self._num("force_export_duration", 120.0) * 60),
-                reset_timer=False,
+            d = self._coordinator.data or {}
+            soc = d.get("soc_battery")
+            cutoff_soc = self._num("force_export_cutoff_soc", 4.0)
+            if soc is not None and float(soc) <= cutoff_soc:
+                task = self.hass.async_create_task(
+                    self._async_turn_off_silent(),
+                    name=f"alphaess_{self.switch_key}_soc_off",
+                )
+                self._pending_tasks.add(task)
+                task.add_done_callback(self._pending_tasks.discard)
+                return
+            power_raw = self._compute_force_export_power_raw(d)
+            if power_raw is None:
+                return
+            now = time.monotonic()
+            changed = (
+                self._fe_last_power_raw is None
+                or abs(power_raw - self._fe_last_power_raw) >= _DISPATCH_REWRITE_THRESHOLD_W
             )
+            stale = (now - self._fe_last_write_time) >= _DISPATCH_STALE_REWRITE_S
+            if changed or stale:
+                task = self.hass.async_create_task(
+                    self._start_force_export(
+                        int(self._num("force_export_duration", 120.0) * 60),
+                        reset_timer=False,
+                    ),
+                    name=f"alphaess_{self.switch_key}_export_recalc",
+                )
+                self._pending_tasks.add(task)
+                task.add_done_callback(self._pending_tasks.discard)
 
-        def _callback():
-            task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_export_refresh")
-            self._pending_tasks.add(task)
-            task.add_done_callback(self._pending_tasks.discard)
-
-        self._timer_cancel = loop.call_later(25, _callback)
+        self._fe_listener_unsub = self._coordinator.async_add_listener(_check)
 
     # ------------------------------------------------------------------
     # Generic Dispatch
@@ -637,43 +700,73 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
     # Force Import
     # ------------------------------------------------------------------
 
-    async def _start_force_import(self, duration_s: int, *, reset_timer: bool = True) -> None:
-        d = self._coordinator.data or {}
+    def _compute_force_import_power_raw(self, d: dict) -> int | None:
+        """Return the dispatch active-power word for Force Import, or None if PV/load unavailable.
+
+        charge_power = target_import - house_load + pv (floored at 0); the word is the
+        32000-offset charge power written at dispatch offset 2.
+        """
         pv_production_w = _calc_pv_production(d)
         house_load_w = _calc_house_load(d)
         if house_load_w is None or pv_production_w is None:
-            self._schedule_force_import_refresh()
-            return
+            return None
         import_power_kw = self._num("force_import_power", 5.0)
-        cutoff_soc = self._num("force_import_cutoff_soc", 100.0)
-        soc_raw = int(cutoff_soc / DISPATCH_SOC_SCALE)
         charge_power_w = max(0, int(import_power_kw * 1000) - int(house_load_w) + int(pv_production_w))
-        power_raw = int(32000 - charge_power_w)
+        return int(32000 - charge_power_w)
+
+    async def _start_force_import(self, duration_s: int, *, reset_timer: bool = True) -> None:
+        d = self._coordinator.data or {}
+        cutoff_soc = self._num("force_import_cutoff_soc", 100.0)
+        power_raw = self._compute_force_import_power_raw(d)
+        if power_raw is None:
+            # PV/load not yet available; the watcher retries on the next update.
+            self._start_force_import_watcher(duration_s)
+            return
+        soc_raw = int(cutoff_soc / DISPATCH_SOC_SCALE)
         await self._coordinator.async_write_dispatch([
             1, 0, power_raw, 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, duration_s,
             DISPATCH_FLOW_DIRECTION, DISPATCH_PV_UNCHANGED,
         ], reset_timer=reset_timer)
-        self._schedule_force_import_refresh()
+        self._fi_last_power_raw = power_raw
+        self._fi_last_write_time = time.monotonic()
+        self._start_force_import_watcher(duration_s)
 
-    def _schedule_force_import_refresh(self) -> None:
-        self._cancel_refresh_timer()
-        loop = self.hass.loop
+    def _start_force_import_watcher(self, duration_s: int) -> None:
+        """Recompute the Force Import setpoint on each coordinator update.
 
-        async def _refresh():
+        Rewrites the dispatch when the computed active-power word moves by at least
+        _DISPATCH_REWRITE_THRESHOLD_W, or every _DISPATCH_STALE_REWRITE_S as a drift
+        fallback. Rewrites use reset_timer=False so the duration countdown is preserved.
+        Skips rewrites while fi_paused, matching the previous refresh behaviour.
+        """
+        if self._fi_listener_unsub is not None:
+            return
+
+        def _check() -> None:
             if not self._is_on:
                 return
             if self._coordinator.fi_paused:
-                self._schedule_force_import_refresh()
                 return
-            await self._start_force_import(
-                int(self._num("force_import_duration", 120.0) * 60),
-                reset_timer=False,
+            d = self._coordinator.data or {}
+            power_raw = self._compute_force_import_power_raw(d)
+            if power_raw is None:
+                return
+            now = time.monotonic()
+            changed = (
+                self._fi_last_power_raw is None
+                or abs(power_raw - self._fi_last_power_raw) >= _DISPATCH_REWRITE_THRESHOLD_W
             )
+            stale = (now - self._fi_last_write_time) >= _DISPATCH_STALE_REWRITE_S
+            if changed or stale:
+                task = self.hass.async_create_task(
+                    self._start_force_import(
+                        int(self._num("force_import_duration", 120.0) * 60),
+                        reset_timer=False,
+                    ),
+                    name=f"alphaess_{self.switch_key}_import_recalc",
+                )
+                self._pending_tasks.add(task)
+                task.add_done_callback(self._pending_tasks.discard)
 
-        def _callback():
-            task = self.hass.async_create_task(_refresh(), name=f"alphaess_{self.switch_key}_import_refresh")
-            self._pending_tasks.add(task)
-            task.add_done_callback(self._pending_tasks.discard)
-
-        self._timer_cancel = loop.call_later(25, _callback)
+        self._fi_listener_unsub = self._coordinator.async_add_listener(_check)
 
