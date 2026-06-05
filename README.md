@@ -1,4 +1,4 @@
-# AlphaESS Modbus TCP — Home Assistant Integration
+# AlphaESS Modbus TCP - Home Assistant Integration
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/senalse/ha-alphaess-modbus.svg)](https://github.com/senalse/ha-alphaess-modbus/releases)
@@ -21,24 +21,24 @@ Based on the excellent YAML package by [Axel Koegler](https://projects.hillviewl
 
 ## Features
 
-- **100 sensor entities enabled by default** (165 total) — real-time power flows, battery SoC/SoH, cell voltages, temperatures, voltages, energy totals, daily energy summaries, dispatch diagnostics, grid safety parameters, faults & warnings
-- **Force Charging** — charge battery from grid at configurable power (kW), duration, and cutoff SoC
-- **Force Charging Hold** — keeps Force Charging running indefinitely after the duration expires; turn on before starting Force Charging for continuous charging without a time limit
-- **Force Discharging** — discharge battery at configurable power, duration, and cutoff SoC; automatically stops 1% above the cutoff and resets dispatch so the inverter returns to self-consumption without any grid draw
-- **Force Discharging Hold** — keeps Force Discharging running for the full configured duration instead of stopping early when the SoC target is reached
-- **Force Export** — export to grid at a target feed-in rate (kW); battery discharge is dynamically adjusted for live house load and PV so the grid sees the configured power; stops automatically when the duration expires or battery reaches the cutoff SoC
-- **Force Export Hold** — keeps Force Export running indefinitely after the duration expires; turn on before starting Force Export for continuous export without a time limit
-- **Force Import** — import from grid at a configurable target kW, dynamically adjusting battery charge to offset live PV so total grid draw stays at the target; stops at cutoff SoC
-- **Force Import Hold** — keeps Force Import running indefinitely after the duration expires; turn on before starting Force Import for continuous importing without a time limit
-- **Excess Export** — charge the battery with PV power that would otherwise be clipped by the inverter AC output limit; automatically pauses when the house starts drawing from the grid and resumes once PV recovers
-- **Dispatch PV Enabled** — enable or disable the inverter's PV coupling during an active dispatch (useful for shedding solar in negative-price periods); defaults to on (PV enabled). Toggling it while a dispatch is running applies immediately; otherwise it takes effect on the next dispatch
-- **Battery cell health** — min/max cell voltages polled every 60 s; charge/discharge cutoff voltages, module count, capacity, and type available as diagnostic sensors
-- **Dispatch diagnostics** — energy flow direction (human-readable), PV switch state, frequency dispatch flag, power, and frequency
-- **Charging / Discharging time periods** — configure up to two charge and discharge windows
-- **Dispatch mode selector** — Battery only, SoC Control, Load Following, Maximise Output, and more
-- **Max Feed to Grid** — set grid export limit as % of installed PV capacity
-- **Date & Time sync** — sync inverter clock to Home Assistant system time
-- **Sync Dispatch State** — reconcile HA switch states with the inverter after a restart
+- **103 sensor entities enabled by default** (172 total) - real-time power flows, battery SoC/SoH, cell voltages, temperatures, voltages, energy totals, daily energy summaries, dispatch diagnostics, grid safety parameters, faults & warnings
+- **Force Charging** - charge battery from grid at configurable power (kW), duration, and cutoff SoC
+- **Force Charging Hold** - keeps Force Charging running indefinitely after the duration expires; turn on before starting Force Charging for continuous charging without a time limit
+- **Force Discharging** - discharge battery at configurable power, duration, and cutoff SoC; automatically stops 1% above the cutoff and resets dispatch so the inverter returns to self-consumption without any grid draw
+- **Force Discharging Hold** - keeps Force Discharging running for the full configured duration instead of stopping early when the SoC target is reached
+- **Force Export** - export to grid at a target feed-in rate (kW); battery discharge is dynamically adjusted for live house load and PV so the grid sees the configured power; stops automatically when the duration expires or battery reaches the cutoff SoC
+- **Force Export Hold** - keeps Force Export running indefinitely after the duration expires; turn on before starting Force Export for continuous export without a time limit
+- **Force Import** - import from grid at a configurable target kW, dynamically adjusting battery charge to offset live PV so total grid draw stays at the target; stops at cutoff SoC
+- **Force Import Hold** - keeps Force Import running indefinitely after the duration expires; turn on before starting Force Import for continuous importing without a time limit
+- **Excess Export** - charge the battery with PV power that would otherwise be clipped by the inverter AC output limit; automatically pauses when the house starts drawing from the grid and resumes once PV recovers
+- **Dispatch PV Enabled** - enable or disable the inverter's PV coupling during an active dispatch (useful for shedding solar in negative-price periods); defaults to on (PV enabled). Toggling it while a dispatch is running applies immediately; otherwise it takes effect on the next dispatch
+- **Battery cell health** - min/max cell voltages polled every 60 s; charge/discharge cutoff voltages, module count, capacity, and type available as diagnostic sensors
+- **Dispatch diagnostics** - energy flow direction (human-readable), PV switch state, frequency dispatch flag, power, and frequency
+- **Charging / Discharging time periods** - configure up to two charge and discharge windows
+- **Dispatch mode selector** - Battery only, SoC Control, Load Following, Maximise Output, and more
+- **Max Feed to Grid** - set grid export limit as % of installed PV capacity
+- **Date & Time sync** - sync inverter clock to Home Assistant system time
+- **Sync Dispatch State** - reconcile HA switch states with the inverter after a restart
 
 ---
 
@@ -57,7 +57,7 @@ Based on the excellent YAML package by [Axel Koegler](https://projects.hillviewl
 
 1. Open HACS in Home Assistant
 2. Go to **Integrations** → click the three-dot menu → **Custom Repositories**
-3. Add `https://github.com/senalse/ha-alphaess-modbus` — category: **Integration**
+3. Add `https://github.com/senalse/ha-alphaess-modbus` - category: **Integration**
 4. Click **Download** on the AlphaESS Modbus TCP card
 5. Restart Home Assistant
 
@@ -77,11 +77,11 @@ Based on the excellent YAML package by [Axel Koegler](https://projects.hillviewl
 
 | Field | Default | Notes |
 |-------|---------|-------|
-| Inverter IP Address | — | Use a DHCP reservation for a stable address |
+| Inverter IP Address | - | Use a DHCP reservation for a stable address |
 | Modbus Port | `502` | Change only if you've modified the inverter setting |
 | Slave ID | `85` | Standard for AlphaESS inverters |
 
-4. Click **Submit** — Home Assistant will test the connection before saving
+4. Click **Submit** - Home Assistant will test the connection before saving
 
 ### Multiple Inverters
 
@@ -89,8 +89,8 @@ To run two AlphaESS inverters with the same Home Assistant instance:
 
 1. Add the integration a second time: **Settings → Devices & Services → Add Integration**, search for **AlphaESS Modbus TCP**, and enter the second inverter's IP address.
 2. Immediately rename each device so entity IDs reflect the device name: **Settings → Devices & Services → [device] → pencil icon**. For example, rename one to "AlphaESS Roof" and the other to "AlphaESS Garage".
-3. Home Assistant updates all entity IDs automatically — `sensor.alphaess_inverter_*` becomes `sensor.alphaess_roof_*` and `sensor.alphaess_garage_*`.
-4. Each integration instance maintains its own Modbus TCP connection. The inverter one-connection limit applies per device — the two instances do not share a connection and do not interfere with each other.
+3. Home Assistant updates all entity IDs automatically - `sensor.alphaess_inverter_*` becomes `sensor.alphaess_roof_*` and `sensor.alphaess_garage_*`.
+4. Each integration instance maintains its own Modbus TCP connection. The inverter one-connection limit applies per device - the two instances do not share a connection and do not interfere with each other.
 
 ---
 
@@ -138,7 +138,7 @@ B3 and B3PLUS inverters report some registers with different scale factors. Sele
 
 ### Sensors (read-only)
 
-94 sensors are enabled by default; the remaining 65 are disabled and can be turned on individually in HA under Settings → Devices & Services → [device] → entities. Sensors marked *(disabled)* below are off by default.
+103 sensors are enabled by default; the remaining 69 are disabled and can be turned on individually in HA under Settings → Devices & Services → [device] → entities. Sensors marked *(disabled)* below are off by default.
 
 #### Power (real-time)
 
@@ -294,7 +294,7 @@ These sensors reset each day at midnight using the inverter's lifetime cumulativ
 | Force Export Countdown | min | 5 s | Live remaining time when Force Export is active; 0 otherwise |
 | Force Import Countdown | min | 5 s | Live remaining time when Force Import is active; 0 otherwise |
 
-#### Scheduling — Charging / Discharging Periods
+#### Scheduling - Charging / Discharging Periods
 
 These are read-only sensor views of the scheduling registers. The writable equivalents are the Time and Number entities listed under Controls below.
 
@@ -394,7 +394,7 @@ These are read-only sensor views of the scheduling registers. The writable equiv
 | Force Import | Switch | Import from grid at a target kW, dynamically adjusted for live PV so total grid draw stays at the target; stops at cutoff SoC |
 | Force Import Hold | Switch | Keeps Force Import running indefinitely after the duration expires; turn on before starting Force Import |
 | Force Import Pause | Binary sensor | On when Force Import is automatically paused; resumes automatically when conditions are met |
-| Dispatch | Switch | Generic dispatch — mode, power, SoC target, and duration all configurable independently |
+| Dispatch | Switch | Generic dispatch - mode, power, SoC target, and duration all configurable independently |
 | Excess Export | Switch | Charge battery with PV power that would otherwise be clipped by the AC output limit; auto-pauses when house draws from grid, auto-resumes when PV recovers |
 | Excess Export Pause | Binary sensor | On when Excess Export has automatically paused due to grid import |
 | Dispatch PV Enabled | Switch | Enable (on, default) or disable (off) the inverter's PV coupling during dispatch via register 0x088A; toggling while a dispatch is active writes the register immediately, otherwise it applies on the next dispatch |
@@ -415,9 +415,9 @@ These are read-only sensor views of the scheduling registers. The writable equiv
 | Dispatch Stop at SoC | Number | SoC target % for the generic Dispatch switch |
 | Dispatch Mode | Select | Operating mode for the generic Dispatch switch (Battery Only, SoC Control, Load Following, etc.) |
 | Charging / Discharging Settings | Select | Enable/disable time period control (Disable / Grid Charging / Discharge Time Control / Both) |
-| Inverter AC Limit | Select | Inverter AC output capacity (3–20 kW) — used by Excess Export to avoid overloading the inverter |
+| Inverter AC Limit | Select | Inverter AC output capacity (3–20 kW) - used by Excess Export to avoid overloading the inverter |
 | Max Feed to Grid | Number | Grid export limit (% of PV capacity) |
-| Charging Period 1 Start Time | Time | hh:mm — writes hour and minute registers independently |
+| Charging Period 1 Start Time | Time | hh:mm - writes hour and minute registers independently |
 | Charging Period 1 Stop Time | Time | hh:mm |
 | Charging Period 2 Start Time | Time | hh:mm |
 | Charging Period 2 Stop Time | Time | hh:mm |
@@ -460,14 +460,14 @@ The inverter's Modbus TCP port is `502` and the slave ID is `85` by default. The
 - Confirm the inverter IP is reachable: try `ping <inverter-ip>` from your HA host
 - Check that Modbus TCP is enabled on the inverter (AlphaESS app → Settings → Communication)
 - Make sure no firewall is blocking port 502
-- AlphaESS inverters only allow **one Modbus TCP connection at a time** — if another app (a second HA instance, a Modbus tool, Alpha2MQTT, etc.) is already connected, HA will be refused. Disconnect the other client and reload the integration
+- AlphaESS inverters only allow **one Modbus TCP connection at a time** - if another app (a second HA instance, a Modbus tool, Alpha2MQTT, etc.) is already connected, HA will be refused. Disconnect the other client and reload the integration
 
 **Entities show unavailable after some time**
-- This can happen if the inverter goes into sleep/standby mode at night — it recovers automatically when the inverter wakes up
+- This can happen if the inverter goes into sleep/standby mode at night - it recovers automatically when the inverter wakes up
 - Check HA logs for Modbus timeout errors
 
 **Force charging / dispatch not working**
-- Only one dispatch mode can be active at a time — activating one switch will deactivate any other active switch
+- Only one dispatch mode can be active at a time - activating one switch will deactivate any other active switch
 - Dispatch automatically resets after the configured duration expires
 
 ---
@@ -497,10 +497,10 @@ Example Lovelace dashboard configurations are included in the [`examples/`](exam
 
 | File | Description | Custom cards required |
 |------|-------------|----------------------|
-| `alphaess_dashboard_pfcp.yaml` | Sections-layout dashboard with live power flow diagram — battery controls, scheduling, dispatch, energy stats, system info | [power-flow-card-plus](https://github.com/flixlix/power-flow-card-plus) |
-| `alphaess_dashboard.yaml` | Sections-layout dashboard without custom cards — gauge + glance live view, battery controls, scheduling, dispatch, energy stats, system info | None |
+| `alphaess_dashboard_pfcp.yaml` | Sections-layout dashboard with live power flow diagram - battery controls, scheduling, dispatch, energy stats, system info | [power-flow-card-plus](https://github.com/flixlix/power-flow-card-plus) |
+| `alphaess_dashboard.yaml` | Sections-layout dashboard without custom cards - gauge + glance live view, battery controls, scheduling, dispatch, energy stats, system info | None |
 | `power_diagram.yaml` | Power flow chart for today | [ApexCharts Card](https://github.com/RomRider/apexcharts-card) |
-| `power_diagram_extended.yaml` | Extended power diagrams — today, yesterday, 3-day, string detail, instant, and hi-res views | [ApexCharts Card](https://github.com/RomRider/apexcharts-card) |
+| `power_diagram_extended.yaml` | Extended power diagrams - today, yesterday, 3-day, string detail, instant, and hi-res views | [ApexCharts Card](https://github.com/RomRider/apexcharts-card) |
 
 ### How to use
 
@@ -508,7 +508,7 @@ Example Lovelace dashboard configurations are included in the [`examples/`](exam
    - **power-flow-card-plus**: HACS → Frontend → search "Power Flow Card Plus" → Download
    - **ApexCharts Card**: HACS → Frontend → search "ApexCharts Card" → Download
 2. In Home Assistant go to **Settings → Dashboards → Add Dashboard**
-3. Open the view you want to replace, click the three-dot menu → **Edit in YAML**, and paste the contents of the example file directly (the file starts with `title:` — no extra wrapping needed).
+3. Open the view you want to replace, click the three-dot menu → **Edit in YAML**, and paste the contents of the example file directly (the file starts with `title:` - no extra wrapping needed).
 
 4. Reload the dashboard browser tab after installing any custom cards
 
@@ -534,4 +534,4 @@ Documentation and release notes assisted by [Claude](https://claude.ai) (Anthrop
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT - see [LICENSE](LICENSE)
