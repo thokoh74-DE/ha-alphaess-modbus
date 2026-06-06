@@ -5,7 +5,7 @@ import inspect
 import logging
 import struct
 import time
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusException
@@ -18,6 +18,12 @@ _SLAVE_KWARG = "device_id" if "device_id" in _sig else "slave"
 
 _CONNECT_RETRIES = 2
 _CONNECT_RETRY_DELAY = 1.0  # seconds between retries
+
+# Comms-level failures that mean the socket is dead/half-open. pymodbus raises
+# ModbusException subclasses (ConnectionException, ModbusIOException) for transport
+# errors; protocol errors (e.g. illegal address) are returned via result.isError()
+# instead, and do NOT indicate a broken link.
+_COMM_ERRORS = (ModbusException, asyncio.TimeoutError, OSError)
 
 
 class AlphaESSModbusClient:
@@ -38,13 +44,22 @@ class AlphaESSModbusClient:
     async def connect(self) -> None:
         """Connect with retries — inverter may refuse immediately after a prior close.
 
-        Guarded by _connect_lock so concurrent callers coalesce into one attempt.
+        This wrapper is the single reconnect authority: pymodbus's own background
+        reconnect loop is disabled (reconnect_delay=0) so two mechanisms don't fight
+        over the inverter's one-connection limit. The previous client is always closed
+        before a new one is created, so a reconnect never leaks a socket. Guarded by
+        _connect_lock so concurrent callers coalesce into one attempt.
         """
         async with self._connect_lock:
-            self._client = AsyncModbusTcpClient(self._host, port=self._port, timeout=5)
+            # Never leak a prior client (and its socket); tear it down first.
+            self._teardown_client()
+            client = AsyncModbusTcpClient(
+                self._host, port=self._port, timeout=5, reconnect_delay=0
+            )
             for attempt in range(_CONNECT_RETRIES):
-                await self._client.connect()
-                if self._client.connected:
+                await client.connect()
+                if client.connected:
+                    self._client = client
                     return
                 if attempt < _CONNECT_RETRIES - 1:
                     _LOGGER.debug(
@@ -52,11 +67,23 @@ class AlphaESSModbusClient:
                         attempt + 1, _CONNECT_RETRIES, _CONNECT_RETRY_DELAY,
                     )
                     await asyncio.sleep(_CONNECT_RETRY_DELAY)
+            # All attempts failed — don't keep a dead client object around.
+            try:
+                client.close()
+            except Exception:  # noqa: BLE001 — close must never raise on the failure path
+                pass
+
+    def _teardown_client(self) -> None:
+        """Close and forget the current client (synchronous; pymodbus close() is sync)."""
+        if self._client is not None:
+            try:
+                self._client.close()
+            except Exception:  # noqa: BLE001
+                pass
+            self._client = None
 
     async def close(self) -> None:
-        if self._client:
-            self._client.close()
-            self._client = None
+        self._teardown_client()
 
     async def _ensure_connected(self) -> None:
         if not self.connected:
@@ -77,6 +104,25 @@ class AlphaESSModbusClient:
         if not self.connected:
             raise ModbusException("Not connected")
 
+    async def _request(
+        self, call: Callable[[], Awaitable[Any]], what: str
+    ) -> Any:
+        """Run one pymodbus request, dropping the connection on a comms failure.
+
+        A raised comms error means the socket is dead or half-open (e.g. after a
+        router restart): close it so the next cycle reconnects cleanly instead of
+        reusing a zombie connection forever. A returned isError() result is a
+        protocol error on a healthy link and leaves the connection intact.
+        """
+        try:
+            result = await call()
+        except _COMM_ERRORS as err:
+            self._teardown_client()
+            raise ModbusException(f"Comm error {what}: {err}") from err
+        if result.isError():
+            raise ModbusException(f"Error {what}: {result}")
+        return result
+
     async def read_block(self, start: int, count: int) -> list[int]:
         """Read `count` consecutive holding registers starting at `start`.
 
@@ -84,11 +130,12 @@ class AlphaESSModbusClient:
         """
         async with self._lock:
             await self._ensure_connected()
-            result = await self._client.read_holding_registers(
-                start, count=count, **{_SLAVE_KWARG: self._slave_id}
+            result = await self._request(
+                lambda: self._client.read_holding_registers(
+                    start, count=count, **{_SLAVE_KWARG: self._slave_id}
+                ),
+                f"reading block {start:#06x}+{count}",
             )
-            if result.isError():
-                raise ModbusException(f"Error reading block {start:#06x}+{count}: {result}")
             return list(result.registers)
 
     async def read_register(self, address: int, data_type: str, count: int = 1) -> Any:
@@ -99,20 +146,22 @@ class AlphaESSModbusClient:
         await self._ensure_connected()
 
         if data_type == "string":
-            result = await self._client.read_holding_registers(
-                address, count=count, **{_SLAVE_KWARG: self._slave_id}
+            result = await self._request(
+                lambda: self._client.read_holding_registers(
+                    address, count=count, **{_SLAVE_KWARG: self._slave_id}
+                ),
+                f"reading {address:#06x}",
             )
-            if result.isError():
-                raise ModbusException(f"Error reading {address:#06x}: {result}")
             raw = b"".join(struct.pack(">H", r) for r in result.registers)
             return raw.decode("ascii", errors="replace").rstrip("\x00")
 
         reg_count = 2 if data_type in ("int32", "uint32") else 1
-        result = await self._client.read_holding_registers(
-            address, count=reg_count, **{_SLAVE_KWARG: self._slave_id}
+        result = await self._request(
+            lambda: self._client.read_holding_registers(
+                address, count=reg_count, **{_SLAVE_KWARG: self._slave_id}
+            ),
+            f"reading {address:#06x}",
         )
-        if result.isError():
-            raise ModbusException(f"Error reading {address:#06x}: {result}")
 
         regs = result.registers
         if data_type == "int16":
@@ -136,17 +185,19 @@ class AlphaESSModbusClient:
     async def write_registers(self, address: int, values: list[int]) -> None:
         async with self._lock:
             await self._ensure_connected()
-            result = await self._client.write_registers(
-                address, values, **{_SLAVE_KWARG: self._slave_id}
+            await self._request(
+                lambda: self._client.write_registers(
+                    address, values, **{_SLAVE_KWARG: self._slave_id}
+                ),
+                f"writing {address:#06x}",
             )
-            if result.isError():
-                raise ModbusException(f"Error writing {address:#06x}: {result}")
 
     async def write_register(self, address: int, value: int) -> None:
         async with self._lock:
             await self._ensure_connected()
-            result = await self._client.write_register(
-                address, value, **{_SLAVE_KWARG: self._slave_id}
+            await self._request(
+                lambda: self._client.write_register(
+                    address, value, **{_SLAVE_KWARG: self._slave_id}
+                ),
+                f"writing {address:#06x}",
             )
-            if result.isError():
-                raise ModbusException(f"Error writing {address:#06x}: {result}")
