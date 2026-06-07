@@ -1,14 +1,18 @@
 # Changelog
 
-### v1.14.0-beta.2
-- **fix:** Force Export and Force Import now hold the grid at the target power steadily instead of oscillating. The power was being recalculated from a house-load figure that already included the battery's own output, which fed back on itself and made the battery swing between roughly 1 kW and 4 kW every couple of seconds at a low export target. The control now adjusts the battery directly against the measured grid power, so export and import sit at the set target and recover smoothly after a sudden load change, with no grid import at low settings.
-- **upgrading from v1.14.0-beta.1:** No entities or settings change. Force Export and Force Import simply regulate more smoothly and accurately.
+### v1.14.0
 
----
+#### What's new
 
-### v1.14.0-beta.1
-- **feat:** Changing the power or cutoff SoC of a running force operation (Force Charging, Force Discharging, Force Export, Force Import) or the generic Dispatch now takes effect immediately without restarting the duration countdown. Previously any change to a running operation restarted the countdown, so it ran longer than intended unless you turned it off manually. The original stop time is now preserved; only changing the duration restarts the countdown.
-- **upgrading from v1.13.1:** No entities are renamed, removed, or added, so dashboards and automations are unaffected. There are no new settings. The only behaviour change is that adjusting power or cutoff SoC while an operation is running no longer extends the countdown. If you have an automation that relied on the countdown restarting when power changed, update the duration instead.
+- Changing the power or cutoff SoC of a running force operation (Force Charging, Force Discharging, Force Export, Force Import) or the generic Dispatch now takes effect immediately without restarting the duration countdown. The original stop time is preserved; only changing the duration restarts the countdown. Previously any change to a running operation restarted the countdown, so it could run longer than intended unless you turned it off manually.
+
+#### Bug fixes
+
+- Force Export and Force Import now hold the grid at the target power steadily instead of oscillating. The power was being recalculated from a house-load figure that already included the battery's own output, which fed back on itself and could make the battery swing between roughly 1 kW and 4 kW every couple of seconds at a low export target. The control now adjusts the battery directly against the measured grid power, so export and import sit at the set target and recover smoothly after a sudden load change, with no grid import at low settings.
+
+#### Upgrading from v1.13.1
+
+- No entities are renamed, removed, or added, so dashboards and automations are unaffected. There are no new settings. Two behaviour changes: adjusting power or cutoff SoC while a force operation is running no longer extends the countdown (only changing the duration does), and Force Export and Force Import regulate more smoothly and accurately. If you have an automation that relied on the countdown restarting when the power changed, update the duration instead.
 
 ---
 
