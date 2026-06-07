@@ -227,6 +227,37 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             self._is_on = False
             self.async_write_ha_state()
 
+    async def async_apply_param_change(self, *, reset_timer: bool) -> None:
+        """Re-apply this switch's dispatch after a mid-run parameter change.
+
+        Called from number._refire_if_active when a dispatch-param slider changes
+        while the switch is on. A duration change (reset_timer=True) restarts the
+        countdown via the full start sequence; a power or cutoff-SoC change
+        (reset_timer=False) rewrites only the setpoint and leaves the countdown,
+        auto-off timer and any active watcher running.
+        """
+        if not self._is_on:
+            return
+        if reset_timer:
+            await self.async_turn_on()
+            return
+        try:
+            if self.switch_key == "force_charging":
+                await self._start_force_charging(reset_timer=False)
+            elif self.switch_key == "force_discharging":
+                duration_s = int(self._num("force_discharging_duration", 120.0) * 60)
+                await self._start_force_discharging(duration_s, reset_timer=False)
+            elif self.switch_key == "force_export":
+                duration_s = int(self._num("force_export_duration", 120.0) * 60)
+                await self._start_force_export(duration_s, reset_timer=False)
+            elif self.switch_key == "force_import":
+                duration_s = int(self._num("force_import_duration", 120.0) * 60)
+                await self._start_force_import(duration_s, reset_timer=False)
+            elif self.switch_key == "dispatch":
+                await self._start_dispatch(reset_timer=False)
+        except Exception as err:
+            _LOGGER.error("Failed to apply param change for %s: %s", self.switch_key, err)
+
     async def async_turn_off(self, **kwargs: Any) -> None:
         if self.switch_key == "dispatch_pv":
             self._is_on = False
@@ -413,7 +444,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
     # Force Charging
     # ------------------------------------------------------------------
 
-    async def _start_force_charging(self) -> None:
+    async def _start_force_charging(self, *, reset_timer: bool = True) -> None:
         power_kw = self._num("force_charging_power", 5.0)
         cutoff_soc = self._num("force_charging_cutoff_soc", 100.0)
         duration_min = self._num("force_charging_duration", 120.0)
@@ -432,14 +463,17 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             0, duration_s,
             DISPATCH_FLOW_DIRECTION,
             DISPATCH_PV_UNCHANGED,
-        ])
-        self._schedule_auto_off(duration_s)
+        ], reset_timer=reset_timer)
+        # reset_timer=False is a mid-run setpoint change: keep the existing
+        # countdown and auto-off timer rather than restarting them.
+        if reset_timer:
+            self._schedule_auto_off(duration_s)
 
     # ------------------------------------------------------------------
     # Force Discharging
     # ------------------------------------------------------------------
 
-    async def _start_force_discharging(self, duration_s: int) -> None:
+    async def _start_force_discharging(self, duration_s: int, *, reset_timer: bool = True) -> None:
         data = self._coordinator.data or {}
         soc = data.get("soc_battery")
         power_kw = self._num("force_discharging_power", 5.0)
@@ -452,7 +486,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         await self._coordinator.async_write_dispatch([
             1, 0, power_raw, 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, duration_s,
             DISPATCH_FLOW_DIRECTION, DISPATCH_PV_UNCHANGED,
-        ])
+        ], reset_timer=reset_timer)
 
     # ------------------------------------------------------------------
     # Force Export
@@ -543,7 +577,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
     # Generic Dispatch
     # ------------------------------------------------------------------
 
-    async def _start_dispatch(self) -> None:
+    async def _start_dispatch(self, *, reset_timer: bool = True) -> None:
         power_kw = self._num("dispatch_power", 0.0)
         cutoff_soc = self._num("dispatch_cutoff_soc", 100.0)
         duration_min = self._num("dispatch_duration", 120.0)
@@ -568,8 +602,11 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             0, duration_s,
             DISPATCH_FLOW_DIRECTION,
             self._pv_switch_value(),
-        ])
-        self._schedule_auto_off(duration_s)
+        ], reset_timer=reset_timer)
+        # reset_timer=False is a mid-run setpoint change: keep the existing
+        # countdown and auto-off timer rather than restarting them.
+        if reset_timer:
+            self._schedule_auto_off(duration_s)
 
     # ------------------------------------------------------------------
     # Excess Export

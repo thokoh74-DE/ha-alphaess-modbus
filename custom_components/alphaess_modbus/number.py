@@ -142,4 +142,8 @@ class AlphaESSNumber(RestoreEntity, NumberEntity):
         switches = self.hass.data[DOMAIN].get(f"{self._entry.entry_id}_switches", {})
         sw = switches.get(switch_key)
         if sw and sw.is_on:
-            await sw.async_turn_on()
+            # A duration change moves the stop time, so restart the countdown.
+            # A power or cutoff-SoC change only updates the setpoint and must
+            # leave the running countdown untouched (issue #14).
+            reset_timer = self._reg.key.endswith("_duration")
+            await sw.async_apply_param_change(reset_timer=reset_timer)
