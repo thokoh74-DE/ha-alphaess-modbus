@@ -26,14 +26,22 @@ from .coordinator import AlphaESSCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# Force Export / Force Import event-driven rewrite tuning.
-# The dispatch setpoint is recomputed on every coordinator update (~2 s poll) and
-# rewritten only when the computed active-power word moves by at least this many
-# watts, or when this many seconds have elapsed since the last write (drift/liveness
-# fallback). This replaces the old fixed 25 s refresh so load changes are tracked
-# within one poll cycle instead of up to 25 s, which prevents grid import at low
-# export/import power settings.
-_DISPATCH_REWRITE_THRESHOLD_W = 50
+# Force Export / Force Import setpoint servo tuning.
+# On every coordinator update (~2 s poll) the battery setpoint is trimmed so the
+# measured grid power moves toward the target (export = -target, import = +target).
+# This is a closed loop on the grid meter, NOT a feed-forward from the calculated
+# house load: the house-load estimate is derived from battery + grid, so feeding it
+# back drove a kilowatt-scale limit cycle (the battery's own output fed into its next
+# command). Servoing on grid alone breaks that feedback.
+#
+# new_setpoint = last_setpoint + _SERVO_GAIN * grid_error
+# With ~one poll of meter lag the loop is critically damped near gain 0.25, so a gain
+# of 0.3 gives a fast, essentially overshoot-free response (important for zero-import
+# export tariffs) and zero steady-state error. Raise for faster recovery, lower if it
+# ever hunts. A rewrite is only issued once the setpoint moves by _SERVO_DEADBAND_W,
+# with a _DISPATCH_STALE_REWRITE_S liveness fallback.
+_SERVO_GAIN = 0.3
+_SERVO_DEADBAND_W = 80
 _DISPATCH_STALE_REWRITE_S = 60
 
 
@@ -506,6 +514,14 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         battery_discharge_w = max(0, target_export_w + int(house_load_w) - int(pv_production_w))
         return int(32000 + battery_discharge_w)
 
+    async def _write_export_dispatch(self, word: int, duration_s: int, *, reset_timer: bool) -> None:
+        cutoff_soc = self._num("force_export_cutoff_soc", 4.0)
+        soc_raw = int(cutoff_soc / DISPATCH_SOC_SCALE)
+        await self._coordinator.async_write_dispatch([
+            1, 0, int(word), 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, duration_s,
+            DISPATCH_FLOW_DIRECTION, DISPATCH_PV_UNCHANGED,
+        ], reset_timer=reset_timer)
+
     async def _start_force_export(self, duration_s: int, *, reset_timer: bool = True) -> None:
         d = self._coordinator.data or {}
         soc = d.get("soc_battery")
@@ -513,26 +529,26 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         if soc is not None and float(soc) <= cutoff_soc:
             await self._async_turn_off_silent()
             return
+        # Seed the servo with the feed-forward estimate. At turn-on the battery is not
+        # yet dispatching, so the house-load term is accurate; the watcher takes over
+        # with grid-error servoing thereafter.
         power_raw = self._compute_force_export_power_raw(d)
         if power_raw is None:
-            # PV/load not yet available; the watcher retries on the next update.
+            # PV/load not yet available; the watcher seeds itself on the next update.
             self._start_force_export_watcher(duration_s)
             return
-        soc_raw = int(cutoff_soc / DISPATCH_SOC_SCALE)
-        await self._coordinator.async_write_dispatch([
-            1, 0, power_raw, 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, duration_s,
-            DISPATCH_FLOW_DIRECTION, DISPATCH_PV_UNCHANGED,
-        ], reset_timer=reset_timer)
+        await self._write_export_dispatch(power_raw, duration_s, reset_timer=reset_timer)
         self._fe_last_power_raw = power_raw
         self._fe_last_write_time = time.monotonic()
         self._start_force_export_watcher(duration_s)
 
     def _start_force_export_watcher(self, duration_s: int) -> None:
-        """Recompute the Force Export setpoint on each coordinator update.
+        """Servo the Force Export battery setpoint on each coordinator update.
 
-        Rewrites the dispatch when the computed active-power word moves by at least
-        _DISPATCH_REWRITE_THRESHOLD_W, or every _DISPATCH_STALE_REWRITE_S as a drift
-        fallback. Rewrites use reset_timer=False so the duration countdown is preserved.
+        Trims the battery discharge word so the grid meter moves toward -target
+        (exporting `target`), using grid error only (see _SERVO_GAIN notes). Rewrites
+        use reset_timer=False so the duration countdown is preserved, and are issued
+        only when the setpoint moves by _SERVO_DEADBAND_W or every _DISPATCH_STALE_REWRITE_S.
         """
         if self._fe_listener_unsub is not None:
             return
@@ -551,25 +567,41 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
                 self._pending_tasks.add(task)
                 task.add_done_callback(self._pending_tasks.discard)
                 return
-            power_raw = self._compute_force_export_power_raw(d)
-            if power_raw is None:
+            grid = d.get("power_grid")
+            if grid is None:
                 return
+            target_w = int(self._num("force_export_power", 5.0) * 1000)
+            if self._fe_last_power_raw is None:
+                # No baseline yet (initial feed-forward was deferred). Seed from the
+                # feed-forward estimate if available, else assume discharge == target.
+                seed = self._compute_force_export_power_raw(d)
+                word = seed if seed is not None else int(32000 + max(0, target_w))
+            else:
+                # Servo: drive grid toward -target by trimming the discharge word.
+                # error > 0 means exporting too little, so discharge more.
+                error_w = float(grid) + target_w
+                new_discharge = (self._fe_last_power_raw - 32000) + _SERVO_GAIN * error_w
+                new_discharge = max(0.0, min(float(self._coordinator.ac_limit_w), new_discharge))
+                word = int(round(32000 + new_discharge))
             now = time.monotonic()
             changed = (
                 self._fe_last_power_raw is None
-                or abs(power_raw - self._fe_last_power_raw) >= _DISPATCH_REWRITE_THRESHOLD_W
+                or abs(word - self._fe_last_power_raw) >= _SERVO_DEADBAND_W
             )
             stale = (now - self._fe_last_write_time) >= _DISPATCH_STALE_REWRITE_S
             if changed or stale:
                 task = self.hass.async_create_task(
-                    self._start_force_export(
+                    self._write_export_dispatch(
+                        word,
                         int(self._num("force_export_duration", 120.0) * 60),
                         reset_timer=False,
                     ),
-                    name=f"alphaess_{self.switch_key}_export_recalc",
+                    name=f"alphaess_{self.switch_key}_export_servo",
                 )
                 self._pending_tasks.add(task)
                 task.add_done_callback(self._pending_tasks.discard)
+                self._fe_last_power_raw = word
+                self._fe_last_write_time = now
 
         self._fe_listener_unsub = self._coordinator.async_add_listener(_check)
 
@@ -751,29 +783,35 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         charge_power_w = max(0, int(import_power_kw * 1000) - int(house_load_w) + int(pv_production_w))
         return int(32000 - charge_power_w)
 
-    async def _start_force_import(self, duration_s: int, *, reset_timer: bool = True) -> None:
-        d = self._coordinator.data or {}
+    async def _write_import_dispatch(self, word: int, duration_s: int, *, reset_timer: bool) -> None:
         cutoff_soc = self._num("force_import_cutoff_soc", 100.0)
-        power_raw = self._compute_force_import_power_raw(d)
-        if power_raw is None:
-            # PV/load not yet available; the watcher retries on the next update.
-            self._start_force_import_watcher(duration_s)
-            return
         soc_raw = int(cutoff_soc / DISPATCH_SOC_SCALE)
         await self._coordinator.async_write_dispatch([
-            1, 0, power_raw, 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, duration_s,
+            1, 0, int(word), 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, duration_s,
             DISPATCH_FLOW_DIRECTION, DISPATCH_PV_UNCHANGED,
         ], reset_timer=reset_timer)
+
+    async def _start_force_import(self, duration_s: int, *, reset_timer: bool = True) -> None:
+        d = self._coordinator.data or {}
+        # Seed the servo with the feed-forward estimate (accurate at turn-on, before the
+        # battery is dispatching); the watcher takes over with grid-error servoing.
+        power_raw = self._compute_force_import_power_raw(d)
+        if power_raw is None:
+            # PV/load not yet available; the watcher seeds itself on the next update.
+            self._start_force_import_watcher(duration_s)
+            return
+        await self._write_import_dispatch(power_raw, duration_s, reset_timer=reset_timer)
         self._fi_last_power_raw = power_raw
         self._fi_last_write_time = time.monotonic()
         self._start_force_import_watcher(duration_s)
 
     def _start_force_import_watcher(self, duration_s: int) -> None:
-        """Recompute the Force Import setpoint on each coordinator update.
+        """Servo the Force Import battery setpoint on each coordinator update.
 
-        Rewrites the dispatch when the computed active-power word moves by at least
-        _DISPATCH_REWRITE_THRESHOLD_W, or every _DISPATCH_STALE_REWRITE_S as a drift
-        fallback. Rewrites use reset_timer=False so the duration countdown is preserved.
+        Trims the battery charge word so the grid meter moves toward +target
+        (importing `target`), using grid error only (see _SERVO_GAIN notes). Rewrites
+        use reset_timer=False so the duration countdown is preserved, and are issued
+        only when the setpoint moves by _SERVO_DEADBAND_W or every _DISPATCH_STALE_REWRITE_S.
         Skips rewrites while fi_paused, matching the previous refresh behaviour.
         """
         if self._fi_listener_unsub is not None:
@@ -785,25 +823,41 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             if self._coordinator.fi_paused:
                 return
             d = self._coordinator.data or {}
-            power_raw = self._compute_force_import_power_raw(d)
-            if power_raw is None:
+            grid = d.get("power_grid")
+            if grid is None:
                 return
+            target_w = int(self._num("force_import_power", 5.0) * 1000)
+            if self._fi_last_power_raw is None:
+                # No baseline yet (initial feed-forward was deferred). Seed from the
+                # feed-forward estimate if available, else assume charge == target.
+                seed = self._compute_force_import_power_raw(d)
+                word = seed if seed is not None else int(32000 - max(0, target_w))
+            else:
+                # Servo: drive grid toward +target by trimming the charge word.
+                # error > 0 means importing too little, so charge more.
+                error_w = target_w - float(grid)
+                new_charge = (32000 - self._fi_last_power_raw) + _SERVO_GAIN * error_w
+                new_charge = max(0.0, min(float(self._coordinator.ac_limit_w), new_charge))
+                word = int(round(32000 - new_charge))
             now = time.monotonic()
             changed = (
                 self._fi_last_power_raw is None
-                or abs(power_raw - self._fi_last_power_raw) >= _DISPATCH_REWRITE_THRESHOLD_W
+                or abs(word - self._fi_last_power_raw) >= _SERVO_DEADBAND_W
             )
             stale = (now - self._fi_last_write_time) >= _DISPATCH_STALE_REWRITE_S
             if changed or stale:
                 task = self.hass.async_create_task(
-                    self._start_force_import(
+                    self._write_import_dispatch(
+                        word,
                         int(self._num("force_import_duration", 120.0) * 60),
                         reset_timer=False,
                     ),
-                    name=f"alphaess_{self.switch_key}_import_recalc",
+                    name=f"alphaess_{self.switch_key}_import_servo",
                 )
                 self._pending_tasks.add(task)
                 task.add_done_callback(self._pending_tasks.discard)
+                self._fi_last_power_raw = word
+                self._fi_last_write_time = now
 
         self._fi_listener_unsub = self._coordinator.async_add_listener(_check)
 
