@@ -1,14 +1,15 @@
 # Changelog
 
-### v1.13.1-beta.2
-- **fix:** Home Assistant now recovers its Modbus connection to the inverter after a router restart. Previously a router reset could leave the connection stuck in a state that never recovered on its own, so sensors went unavailable and controls stopped working until Home Assistant or the integration was restarted. The integration now detects a dead or half-open connection, closes it, and reconnects cleanly on the next poll. This also makes recovery reliable when a force operation or automation is running at the time of the interruption.
-- **upgrading from v1.13.1-beta.1:** No entities are renamed, removed, or added, so dashboards and automations are unaffected. There are no new settings. This only improves how the integration recovers its connection after a network interruption.
+### v1.13.1
 
----
+#### Bug fixes
 
-### v1.13.1-beta.1
-- **fix:** Force Export and Force Import now adjust the battery dispatch as soon as house load or solar changes, instead of waiting for a fixed 25-second cycle. At low export power settings a sudden load such as a kettle could previously pull power from the grid for up to 25 seconds before the next adjustment; it is now corrected within about a poll cycle (a couple of seconds), which matters for zero-import export tariffs.
-- **upgrading from v1.13.0:** No entities are renamed or removed, so dashboards and automations are unaffected. There are no new settings. Force Export and Force Import simply react faster to load and solar changes.
+- Home Assistant now recovers its Modbus connection to the inverter after a router restart. Previously a router reset could leave the connection stuck in a state that never recovered on its own, so sensors went unavailable and controls stopped working until Home Assistant or the integration was restarted. The integration now detects a dead or half-open connection, closes it, and reconnects cleanly on the next poll. This also makes recovery reliable when a force operation or automation is running at the time of the interruption.
+- Force Export and Force Import now adjust the battery dispatch as soon as house load or solar changes, instead of waiting for a fixed 25-second cycle. At low export power settings a sudden load such as a kettle could previously pull power from the grid for up to 25 seconds before the next adjustment; it is now corrected within about a poll cycle (a couple of seconds), which matters for zero-import export tariffs.
+
+#### Upgrading from v1.13.0
+
+- No entities are renamed, removed, or added, so dashboards and automations are unaffected. There are no new settings. This release only improves connection recovery after a network interruption and how quickly Force Export and Force Import react to load and solar changes.
 
 ---
 
