@@ -1,5 +1,11 @@
 # Changelog
 
+### v1.14.0-beta.1
+- **feat:** Changing the power or cutoff SoC of a running force operation (Force Charging, Force Discharging, Force Export, Force Import) or the generic Dispatch now takes effect immediately without restarting the duration countdown. Previously any change to a running operation restarted the countdown, so it ran longer than intended unless you turned it off manually. The original stop time is now preserved; only changing the duration restarts the countdown.
+- **upgrading from v1.13.1:** No entities are renamed, removed, or added, so dashboards and automations are unaffected. There are no new settings. The only behaviour change is that adjusting power or cutoff SoC while an operation is running no longer extends the countdown. If you have an automation that relied on the countdown restarting when power changed, update the duration instead.
+
+---
+
 ### v1.13.1
 
 #### Bug fixes
