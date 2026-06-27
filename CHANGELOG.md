@@ -1,5 +1,28 @@
 # Changelog
 
+### v1.15.3
+
+#### What's new
+
+- **Automatic dispatch reset on HA shutdown and integration unload.** When Home Assistant shuts down gracefully or the integration is reloaded (HACS update, config change, manual reload), any active Force Export / Force Import / Force Charging / Dispatch session is now automatically stopped and the inverter returns to self-consumption mode. Previously the inverter kept running the last dispatch command indefinitely until its own internal timer expired or a manual *Dispatch Reset* was triggered.
+
+Two complementary hooks are registered in `__init__.py`:
+
+| Hook | Fires when | Effect |
+|------|-----------|--------|
+| `EVENT_HOMEASSISTANT_STOP` listener | Graceful HA shutdown | Sends dispatch reset before the event loop closes |
+| Reset in `async_unload_entry` | Integration reload / HACS update / config change | Sends dispatch reset before the Modbus connection is closed |
+
+Both hooks are guarded by `coordinator.active_dispatch_key is not None` and are a no-op when no dispatch is active — no impact on normal polling cycles. The persisted dispatch key is also cleared so a subsequent restart does not attempt a *Sync Dispatch State* for a dispatch that was already stopped cleanly.
+
+**DE:** Beim geordneten HA-Shutdown oder Integrations-Reload (HACS-Update, Konfigurationsänderung, manueller Reload) wird nun automatisch ein Dispatch-Reset gesendet, damit der Wechselrichter in den Normalbetrieb zurückkehrt. Beide Hooks prüfen `active_dispatch_key is not None` und sind bei inaktivem Dispatch ein No-Op ohne Einfluss auf normale Poll-Zyklen.
+
+#### Upgrading from v1.15.2
+
+No entities are renamed, removed, or added. The only behaviour change is the automatic dispatch reset on shutdown/reload. After updating, restart Home Assistant — a config entry reload is sufficient.
+
+---
+
 ### v1.15.2
 
 #### Bug fixes
