@@ -1,7 +1,10 @@
 {
   "domain": "alphaess_modbus",
   "name": "AlphaESS Modbus TCP",
-  "codeowners": ["@thokoh74-DE"],
+  "version": "1.15.3"
+  "codeowners": [
+    "@thokoh74-DE"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/thokoh74-DE/ha-alphaess-modbus",
   "integration_type": "device",
@@ -10,5 +13,5 @@
   "requirements": [
     "pymodbus>=3.7.4"
   ],
-  "version": "1.15.3"
+
 }
