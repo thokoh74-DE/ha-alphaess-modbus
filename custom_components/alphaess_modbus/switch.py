@@ -16,6 +16,7 @@ from .const import (
     DOMAIN,
     DISPATCH_MODE_SOC_CONTROL,
     DISPATCH_SOC_SCALE,
+    DISPATCH_SOC_NONE,
     DISPATCH_FLOW_DIRECTION,
     DISPATCH_PV_SWITCH_ADDR,
     DISPATCH_PV_ON,
@@ -118,7 +119,6 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         self._entry = entry
         self.switch_key = definition["key"]
         self._attr_unique_id = f"{entry.entry_id}_{self.switch_key}"
-        self._attr_name = definition["name"]
         self._attr_translation_key = self.switch_key
         self._attr_icon = definition["icon"]
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
@@ -191,7 +191,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
                 await sw._async_turn_off_silent()
 
         self._is_on = True
-        self._coordinator.active_dispatch_key = self.switch_key
+        await self._coordinator.async_set_active_dispatch_key(self.switch_key)
         self.async_write_ha_state()
 
         try:
@@ -217,7 +217,13 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
                 if not self._is_on:
                     return
                 self._schedule_duration_off(duration_s)
-                self._start_battery_power_watcher("force_export_hold")
+                # No _start_battery_power_watcher here (upstream v1.15.0-beta.3): with
+                # Force Export now able to charge the battery from PV surplus, "battery
+                # power near zero for 10s" is a normal steady state (PV ≈ load + target),
+                # not a sign the operation is done — that watcher would have wrongly
+                # auto-stopped Force Export every time PV settled at the target. The
+                # SoC-cutoff check in the servo watcher below is the only auto-stop path,
+                # and it already only fires while actually discharging.
             elif self.switch_key == "force_import":
                 duration_min = self._num("force_import_duration", 120.0)
                 duration_s = int(duration_min * 60)
@@ -282,7 +288,7 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
     async def _async_turn_off_silent(self) -> None:
         self._is_on = False
         if self._coordinator.active_dispatch_key == self.switch_key:
-            self._coordinator.active_dispatch_key = None
+            await self._coordinator.async_set_active_dispatch_key(None)
         self._cancel_timer()
         self.async_write_ha_state()
         if self.switch_key in _HOLD_SWITCHES:
@@ -393,13 +399,20 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
         """
         self._is_on = False
         if self._coordinator.active_dispatch_key == self.switch_key:
-            self._coordinator.active_dispatch_key = None
+            await self._coordinator.async_set_active_dispatch_key(None)
         self._cancel_timer()
         self.async_write_ha_state()
 
     async def async_force_on(self) -> None:
-        """Unconditionally mark this switch on without starting any dispatch."""
+        """Unconditionally mark this switch on without starting any dispatch.
+
+        Used by Sync Dispatch State after a restart, when a dispatch is already
+        running on the inverter. Also records the dispatch key so the per-switch
+        countdown sensor and the PV-switch write gate (_maybe_write_pv_switch) work
+        correctly for the restored switch.
+        """
         self._is_on = True
+        await self._coordinator.async_set_active_dispatch_key(self.switch_key)
         self.async_write_ha_state()
 
     def _start_battery_power_watcher(self, hold_switch_key: str) -> None:
@@ -500,23 +513,44 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
     # Force Export
     # ------------------------------------------------------------------
 
-    def _compute_force_export_power_raw(self, d: dict) -> int | None:
-        """Return the dispatch active-power word for Force Export, or None if PV/load unavailable.
+    def _compute_force_export_battery_power_w(self, d: dict) -> int | None:
+        """Return the signed battery power (W) needed for Force Export, or None if unavailable.
 
-        battery_discharge = target_export + house_load - pv (floored at 0); the word is
-        the 32000-offset discharge power written at dispatch offset 2.
+        Positive = discharge, negative = charge. Deliberately NOT floored at 0: when
+        PV exceeds (house_load + target_export) the result goes negative so the
+        battery keeps absorbing the PV surplus instead of idling at 0 W. This mirrors
+        Hillview's AlphaESS_Force_Export template (no floor there either) — flooring
+        at 0 was the bug that stopped PV from ever reaching the battery while Force
+        Export was active.
         """
         pv_production_w = _calc_pv_production(d)
         house_load_w = _calc_house_load(d)
         if house_load_w is None or pv_production_w is None:
             return None
         target_export_w = int(self._num("force_export_power", 5.0) * 1000)
-        battery_discharge_w = max(0, target_export_w + int(house_load_w) - int(pv_production_w))
-        return int(32000 + battery_discharge_w)
+        battery_power_w = int(house_load_w) + target_export_w - int(pv_production_w)
+        ac_limit = self._coordinator.ac_limit_w
+        return max(-ac_limit, min(ac_limit, battery_power_w))
+
+    def _compute_force_export_power_raw(self, d: dict) -> int | None:
+        """Return the dispatch active-power word for Force Export, or None if PV/load unavailable."""
+        battery_power_w = self._compute_force_export_battery_power_w(d)
+        if battery_power_w is None:
+            return None
+        return int(32000 + battery_power_w)
 
     async def _write_export_dispatch(self, word: int, duration_s: int, *, reset_timer: bool) -> None:
-        cutoff_soc = self._num("force_export_cutoff_soc", 4.0)
-        soc_raw = int(cutoff_soc / DISPATCH_SOC_SCALE)
+        if word > 32000:
+            # Net discharge needed (PV doesn't cover load + target export): apply the
+            # configured discharge-stop SoC as normal.
+            cutoff_soc = self._num("force_export_cutoff_soc", 4.0)
+            soc_raw = int(cutoff_soc / DISPATCH_SOC_SCALE)
+        else:
+            # PV covers (or exceeds) load + target export: the battery is charging or
+            # idle. Ignore the SoC field (Hillview's 255 sentinel) — otherwise the
+            # firmware can read the low discharge-cutoff SoC as an already-reached
+            # charge target and refuse to charge from the PV surplus.
+            soc_raw = DISPATCH_SOC_NONE
         await self._coordinator.async_write_dispatch([
             1, 0, int(word), 0, 32000, DISPATCH_MODE_SOC_CONTROL, soc_raw, 0, duration_s,
             DISPATCH_FLOW_DIRECTION, DISPATCH_PV_UNCHANGED,
@@ -557,20 +591,11 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
             if not self._is_on:
                 return
             d = self._coordinator.data or {}
-            soc = d.get("soc_battery")
-            cutoff_soc = self._num("force_export_cutoff_soc", 4.0)
-            if soc is not None and float(soc) <= cutoff_soc:
-                task = self.hass.async_create_task(
-                    self._async_turn_off_silent(),
-                    name=f"alphaess_{self.switch_key}_soc_off",
-                )
-                self._pending_tasks.add(task)
-                task.add_done_callback(self._pending_tasks.discard)
-                return
             grid = d.get("power_grid")
             if grid is None:
                 return
             target_w = int(self._num("force_export_power", 5.0) * 1000)
+            ac_limit = self._coordinator.ac_limit_w
             if self._fe_last_power_raw is None:
                 # No baseline yet (initial feed-forward was deferred). Seed from the
                 # feed-forward estimate if available, else assume discharge == target.
@@ -578,11 +603,35 @@ class AlphaESSSwitch(RestoreEntity, SwitchEntity):
                 word = seed if seed is not None else int(32000 + max(0, target_w))
             else:
                 # Servo: drive grid toward -target by trimming the discharge word.
-                # error > 0 means exporting too little, so discharge more.
+                # error > 0 means exporting too little, so discharge more. Not floored
+                # at 0: if PV surplus pushes the error negative enough, the word drops
+                # below 32000 and the battery charges from the surplus instead of the
+                # servo stalling at "no power" (the original Force Export bug).
                 error_w = float(grid) + target_w
                 new_discharge = (self._fe_last_power_raw - 32000) + _SERVO_GAIN * error_w
-                new_discharge = max(0.0, min(float(self._coordinator.ac_limit_w), new_discharge))
+                new_discharge = max(-float(ac_limit), min(float(ac_limit), new_discharge))
                 word = int(round(32000 + new_discharge))
+            # The discharge-stop SoC only makes sense while actually discharging
+            # (word > 32000). While PV is recharging the battery, a low SoC is
+            # exactly when Force Export should keep running, not stop.
+            if word > 32000:
+                soc = d.get("soc_battery")
+                cutoff_soc = self._num("force_export_cutoff_soc", 4.0)
+                if soc is not None and float(soc) <= cutoff_soc:
+                    # Respect Force Export Hold (upstream v1.15.0-beta.3): only
+                    # auto-stop if Hold is off. With Hold on, hold the current
+                    # setpoint steady instead of continuing to push it toward
+                    # more discharge.
+                    switches = self.hass.data[DOMAIN].get(f"{self._entry.entry_id}_switches", {})
+                    hold_sw = switches.get("force_export_hold")
+                    if not (hold_sw and hold_sw.is_on):
+                        task = self.hass.async_create_task(
+                            self._async_turn_off_silent(),
+                            name=f"alphaess_{self.switch_key}_soc_off",
+                        )
+                        self._pending_tasks.add(task)
+                        task.add_done_callback(self._pending_tasks.discard)
+                    return
             now = time.monotonic()
             changed = (
                 self._fe_last_power_raw is None

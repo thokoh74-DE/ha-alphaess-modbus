@@ -28,6 +28,7 @@ Based on the excellent YAML package by [Axel Koegler](https://projects.hillviewl
 - **Force Discharging Hold** - keeps Force Discharging running for the full configured duration instead of stopping early when the SoC target is reached
 - **Force Export** - export to grid at a target feed-in rate (kW); battery discharge is dynamically adjusted for live house load and PV so the grid sees the configured power; stops automatically when the duration expires or battery reaches the cutoff SoC
 - **Force Export Hold** - keeps Force Export running indefinitely after the duration expires; turn on before starting Force Export for continuous export without a time limit
+- **Automatic dispatch reset on shutdown / restart** - when Home Assistant shuts down or the integration is reloaded, any active Force Export / Import / Charging dispatch is automatically stopped and the inverter returns to self-consumption mode; no manual reset needed after a reboot
 - **Force Import** - import from grid at a configurable target kW, dynamically adjusting battery charge to offset live PV so total grid draw stays at the target; stops at cutoff SoC
 - **Force Import Hold** - keeps Force Import running indefinitely after the duration expires; turn on before starting Force Import for continuous importing without a time limit
 - **Excess Export** - charge the battery with PV power that would otherwise be clipped by the inverter AC output limit; automatically pauses when the house starts drawing from the grid and resumes once PV recovers
@@ -519,6 +520,40 @@ Example Lovelace dashboard configurations are included in the [`examples/`](exam
 ---
 
 ## Changelog
+
+### v1.15.3 — Automatic dispatch reset on HA shutdown / restart
+
+**EN**
+
+Previously, if Home Assistant was shut down or the integration was reloaded while a Force Export, Force Import, or Force Charging dispatch was active, the inverter kept running the last command indefinitely—until either the dispatch timer expired on the inverter side or a manual *Dispatch Reset* was triggered.
+
+v1.15.3 adds two complementary safety hooks in `__init__.py`:
+
+| Hook | When it fires | What it does |
+|------|--------------|--------------|
+| `EVENT_HOMEASSISTANT_STOP` listener | HA graceful shutdown | Sends dispatch reset before the event loop closes |
+| `async_unload_entry` reset | Integration reload / HACS update / config change | Sends dispatch reset before the Modbus connection is closed |
+
+Both hooks are guarded by `coordinator.active_dispatch_key is not None`, so they are a no-op when no dispatch is active and have zero impact on normal polling cycles.
+The persistent dispatch key is also cleared so a subsequent restart does not attempt a *Sync Dispatch State* for a dispatch that was already stopped.
+
+---
+
+**DE**
+
+Bislang lief der Wechselrichter nach einem HA-Shutdown oder Integrations-Reload weiter im zuletzt gesetzten Dispatch-Modus (Force Export, Force Import oder Force Charging) — solange, bis der interne Dispatch-Timer des Wechselrichters ablief oder manuell *Dispatch Reset* betätigt wurde.
+
+v1.15.3 ergänzt in `__init__.py` zwei komplementäre Sicherheits-Hooks:
+
+| Hook | Auslöser | Aktion |
+|------|----------|--------|
+| `EVENT_HOMEASSISTANT_STOP`-Listener | Geordneter HA-Shutdown | Sendet Dispatch-Reset vor dem Schließen des Event-Loops |
+| Reset in `async_unload_entry` | Integrations-Reload / HACS-Update / Konfigurationsänderung | Sendet Dispatch-Reset vor dem Schließen der Modbus-Verbindung |
+
+Beide Hooks prüfen `coordinator.active_dispatch_key is not None` und sind daher ein No-Op, wenn kein Dispatch aktiv ist – kein Einfluss auf normale Poll-Zyklen.
+Der persistierte Dispatch-Schlüssel wird ebenfalls gelöscht, damit beim nächsten Start kein *Sync Dispatch State* für einen bereits gestoppten Dispatch versucht wird.
+
+---
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 

@@ -390,6 +390,25 @@ SENSOR_REGISTERS: list[ModbusSensorDef] = [
                     state_class="total_increasing", scale=0.1, precision=2, scan_interval=60,
                     description="Lifetime total PV energy generated",
                     group="Energy Totals"),
+    ModbusSensorDef("pv_inverter_energy", "PV Inverter Energy",
+                    0x08D0, "uint32", unit="kWh", device_class="energy",
+                    state_class="total_increasing", scale=0.1, precision=2, scan_interval=60,
+                    description=(
+                        "Lifetime PV energy as reported by the inverter itself. Scale assumed "
+                        "0.1 by analogy with the other uint32 energy totals on this map (0x0120, "
+                        "0x0122, 0x0124, 0x043E) -- verify against the AlphaESS app/portal lifetime "
+                        "PV yield figure and adjust the scale in const.py if it's off by a factor of 10"
+                    ),
+                    group="Energy Totals"),
+    ModbusSensorDef("pv_system_total_energy", "PV System Total Energy",
+                    0x08D2, "uint32", unit="kWh", device_class="energy",
+                    state_class="total_increasing", scale=0.1, precision=2, scan_interval=60,
+                    description=(
+                        "Lifetime PV energy for the whole system (inverter + any AC-coupled PV "
+                        "meter). Scale assumed 0.1, same caveat as PV Inverter Energy above -- verify "
+                        "and adjust if needed"
+                    ),
+                    group="Energy Totals"),
 
     # --- Faults & warnings ---
     ModbusSensorDef("system_fault", "System Fault",
@@ -1148,6 +1167,14 @@ DISPATCH_START_ADDR = 0x0880
 # Dispatch mode values
 DISPATCH_MODE_SOC_CONTROL = 2
 DISPATCH_SOC_SCALE = 0.392  # %/bit
+
+# Sentinel for the Dispatch SoC field (offset 6 / 0x0886) meaning "ignore the SoC
+# target". Force Export/Import write the configured cutoff SoC only while the
+# battery is actually discharging; while PV surplus is charging the battery this
+# sentinel is written instead, otherwise the firmware can treat the (low) discharge
+# cutoff as a charge target already reached and refuse to charge. Mirrors the
+# Hillview YAML package's AlphaESS_Force_Export automation.
+DISPATCH_SOC_NONE = 255
 
 # Trailing dispatch-block registers (offsets 9 and 10 past DISPATCH_START_ADDR).
 # Flow Direction (0x0889) is hardcoded to 255 in every dispatch write.

@@ -70,7 +70,6 @@ class AlphaESSButton(ButtonEntity):
         self._entry_id = entry.entry_id
         self._key = definition["key"]
         self._attr_unique_id = f"{entry.entry_id}_{self._key}"
-        self._attr_name = definition["name"]
         self._attr_translation_key = self._key
         self._attr_icon = definition["icon"]
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
@@ -100,14 +99,8 @@ class AlphaESSButton(ButtonEntity):
         any_on = any(sw.is_on for key, sw in switches.items() if key in _MUTEX_SWITCHES)
 
         if dispatch_on and not any_on:
-            # Infer which switch to mark based on active power direction
             power = (self._coordinator.data or {}).get("dispatch_active_power", 0)
-            if power > 0:
-                inferred_key = "force_export"
-            elif power < 0:
-                inferred_key = "force_charging"
-            else:
-                inferred_key = "dispatch"
+            inferred_key = self._infer_active_dispatch_key(power)
             sw = switches.get(inferred_key)
             if sw:
                 await sw.async_force_on()
@@ -121,3 +114,38 @@ class AlphaESSButton(ButtonEntity):
                     cleared.append(key)
             if cleared:
                 _LOGGER.info("sync_dispatch_state: cleared stale on-state for %s", cleared)
+
+    def _infer_active_dispatch_key(self, power: float) -> str:
+        """Best-effort guess at which switch is behind a live dispatch found after restart.
+
+        Power sign alone used to be enough (Force Export always discharged: power > 0;
+        Force Charging always charged: power < 0). That's no longer true: Force Export
+        now also writes a negative/charging setpoint while PV surplus is recharging the
+        battery, so a negative reading after a restart could be either switch.
+
+        Preferred signal: the dispatch key persisted whenever a switch last turned on
+        or off (coordinator.restored_dispatch_key), as long as it's still consistent
+        with the live power sign — i.e. it wasn't superseded by some other write since
+        the restart. Falling back to the old sign-only guess only when there's no
+        persisted key (fresh install / cleared storage) or it contradicts the sign.
+        """
+        restored = self._coordinator.restored_dispatch_key
+        # Switches whose dispatch word can legitimately be <= 32000 (charge/neutral).
+        consistent_when_charging = {"force_charging", "force_export", "force_import", "excess_export"}
+        # Switches whose dispatch word can legitimately be >= 32000 (discharge/neutral).
+        consistent_when_discharging = {"force_discharging", "force_export"}
+        if restored == "dispatch":
+            return "dispatch"
+        if restored in consistent_when_discharging and power > 0:
+            return restored
+        if restored in consistent_when_charging and power <= 0:
+            return restored
+        # No usable persisted key — fall back to the old two-way guess. This only
+        # covers force_export/force_charging/dispatch, same as before; it cannot
+        # tell force_discharging, force_import or excess_export apart from sign
+        # alone, same limitation as before this fix.
+        if power > 0:
+            return "force_export"
+        if power < 0:
+            return "force_charging"
+        return "dispatch"

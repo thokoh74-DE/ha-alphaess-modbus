@@ -9,13 +9,23 @@
           "port": "Modbus Port",
           "slave_id": "Slave ID"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure AlphaESS Modbus TCP",
+        "description": "Update the connection settings for your AlphaESS inverter. A connection test will be run before saving.",
+        "data": {
+          "host": "Inverter IP Address",
+          "port": "Modbus Port",
+          "slave_id": "Slave ID"
+        }
       }
     },
     "error": {
       "cannot_connect": "Cannot connect to the inverter. Check the IP address, port, and that Modbus TCP is enabled on the inverter."
     },
     "abort": {
-      "already_configured": "This inverter is already configured."
+      "already_configured": "This inverter is already configured.",
+      "reconfigure_successful": "Connection settings updated successfully."
     }
   },
   "options": {
@@ -182,6 +192,507 @@
       },
       "today_battery_charged_from_grid": {
         "name": "Today's Battery Charged from Grid"
+      },
+      "today_s_house_load": {
+        "name": "Today's House Load"
+      },
+      "inverter_grid_frequency": {
+        "name": "Grid Frequency"
+      },
+      "inverter_temperature": {
+        "name": "Inverter Temperature"
+      },
+      "inverter_work_mode": {
+        "name": "Inverter Work Mode"
+      },
+      "inverter_sn": {
+        "name": "Inverter Serial Number"
+      },
+      "bms_version": {
+        "name": "BMS Version"
+      },
+      "lmu_version": {
+        "name": "LMU Version"
+      },
+      "iso_version": {
+        "name": "ISO Version"
+      },
+      "inverter_version": {
+        "name": "Inverter Version"
+      },
+      "inverter_arm_version": {
+        "name": "Inverter ARM Version"
+      },
+      "ems_version_high": {
+        "name": "EMS Version High"
+      },
+      "ems_version_middle": {
+        "name": "EMS Version Middle"
+      },
+      "ems_version_low": {
+        "name": "EMS Version Low"
+      },
+      "ems_version_low_suffix": {
+        "name": "EMS Version Low Suffix"
+      },
+      "system_time_yymm": {
+        "name": "System Time YYMM"
+      },
+      "system_time_ddhh": {
+        "name": "System Time DDHH"
+      },
+      "system_time_mmss": {
+        "name": "System Time MMSS"
+      },
+      "modbus_baud_rate": {
+        "name": "Modbus Baud Rate"
+      },
+      "ip_method": {
+        "name": "IP Method"
+      },
+      "local_ip": {
+        "name": "Local IP"
+      },
+      "subnet_mask": {
+        "name": "Subnet Mask"
+      },
+      "gateway": {
+        "name": "Gateway"
+      },
+      "power_grid": {
+        "name": "Grid Power"
+      },
+      "power_phase_a_grid": {
+        "name": "Grid Power Phase A"
+      },
+      "power_phase_b_grid": {
+        "name": "Grid Power Phase B"
+      },
+      "power_phase_c_grid": {
+        "name": "Grid Power Phase C"
+      },
+      "voltage_phase_a_grid": {
+        "name": "Grid Voltage Phase A"
+      },
+      "voltage_phase_b_grid": {
+        "name": "Grid Voltage Phase B"
+      },
+      "voltage_phase_c_grid": {
+        "name": "Grid Voltage Phase C"
+      },
+      "power_battery": {
+        "name": "Battery Power"
+      },
+      "power_inverter_l1": {
+        "name": "Inverter Power L1"
+      },
+      "power_inverter_l2": {
+        "name": "Inverter Power L2"
+      },
+      "power_inverter_l3": {
+        "name": "Inverter Power L3"
+      },
+      "power_inverter": {
+        "name": "Inverter Power"
+      },
+      "backup_power_inverter_l1": {
+        "name": "Backup Inverter Power L1"
+      },
+      "backup_power_inverter_l2": {
+        "name": "Backup Inverter Power L2"
+      },
+      "backup_power_inverter_l3": {
+        "name": "Backup Inverter Power L3"
+      },
+      "backup_power_inverter": {
+        "name": "Backup Inverter Power"
+      },
+      "active_power_pv_meter": {
+        "name": "Active Power PV Meter"
+      },
+      "pv1_power": {
+        "name": "PV String 1 Power"
+      },
+      "pv1_voltage": {
+        "name": "PV String 1 Voltage"
+      },
+      "pv1_current": {
+        "name": "PV String 1 Current"
+      },
+      "pv2_power": {
+        "name": "PV String 2 Power"
+      },
+      "pv2_voltage": {
+        "name": "PV String 2 Voltage"
+      },
+      "pv2_current": {
+        "name": "PV String 2 Current"
+      },
+      "pv3_power": {
+        "name": "PV String 3 Power"
+      },
+      "pv3_voltage": {
+        "name": "PV String 3 Voltage"
+      },
+      "pv3_current": {
+        "name": "PV String 3 Current"
+      },
+      "pv4_power": {
+        "name": "PV String 4 Power"
+      },
+      "pv4_voltage": {
+        "name": "PV String 4 Voltage"
+      },
+      "pv4_current": {
+        "name": "PV String 4 Current"
+      },
+      "pv_total_power": {
+        "name": "PV Total Power (Inverter)"
+      },
+      "total_energy_feed_to_grid_meter": {
+        "name": "Total Energy Feed to Grid (Meter)"
+      },
+      "total_energy_consumption_from_grid_meter": {
+        "name": "Total Energy Consumption from Grid (Meter)"
+      },
+      "total_energy_feed_to_grid_pv": {
+        "name": "Total Energy Feed to Grid (PV)"
+      },
+      "total_energy_charge_battery": {
+        "name": "Total Energy Charge Battery"
+      },
+      "total_energy_discharge_battery": {
+        "name": "Total Energy Discharge Battery"
+      },
+      "total_energy_charge_battery_from_grid": {
+        "name": "Total Energy Charge Battery from Grid"
+      },
+      "total_energy_from_pv": {
+        "name": "Total Energy from PV"
+      },
+      "pv_inverter_energy": {
+        "name": "PV Inverter Energy"
+      },
+      "pv_system_total_energy": {
+        "name": "PV System Total Energy"
+      },
+      "system_fault": {
+        "name": "System Fault"
+      },
+      "inverter_warning_1": {
+        "name": "Inverter Warning 1"
+      },
+      "inverter_warning_2": {
+        "name": "Inverter Warning 2"
+      },
+      "inverter_fault_1": {
+        "name": "Inverter Fault 1"
+      },
+      "inverter_fault_2": {
+        "name": "Inverter Fault 2"
+      },
+      "battery_warning": {
+        "name": "Battery Warning"
+      },
+      "battery_fault": {
+        "name": "Battery Fault"
+      },
+      "battery_1_warning": {
+        "name": "Battery 1 Warning"
+      },
+      "battery_2_warning": {
+        "name": "Battery 2 Warning"
+      },
+      "battery_3_warning": {
+        "name": "Battery 3 Warning"
+      },
+      "battery_4_warning": {
+        "name": "Battery 4 Warning"
+      },
+      "battery_5_warning": {
+        "name": "Battery 5 Warning"
+      },
+      "battery_6_warning": {
+        "name": "Battery 6 Warning"
+      },
+      "battery_1_fault": {
+        "name": "Battery 1 Fault"
+      },
+      "battery_2_fault": {
+        "name": "Battery 2 Fault"
+      },
+      "battery_3_fault": {
+        "name": "Battery 3 Fault"
+      },
+      "battery_4_fault": {
+        "name": "Battery 4 Fault"
+      },
+      "battery_5_fault": {
+        "name": "Battery 5 Fault"
+      },
+      "battery_6_fault": {
+        "name": "Battery 6 Fault"
+      },
+      "grid_regulation": {
+        "name": "Grid Regulation"
+      },
+      "ovp_l1": {
+        "name": "Overvoltage Protection L1"
+      },
+      "ovp_l1_time": {
+        "name": "Overvoltage Protection L1 Time"
+      },
+      "ovp_l2": {
+        "name": "Overvoltage Protection L2"
+      },
+      "ovp_l2_time": {
+        "name": "Overvoltage Protection L2 Time"
+      },
+      "ovp_l3": {
+        "name": "Overvoltage Protection L3"
+      },
+      "ovp_l3_time": {
+        "name": "Overvoltage Protection L3 Time"
+      },
+      "ovp10": {
+        "name": "Overvoltage Protection 10min"
+      },
+      "ovp10_time": {
+        "name": "Overvoltage Protection 10min Time"
+      },
+      "uvp_l1": {
+        "name": "Undervoltage Protection L1"
+      },
+      "uvp_l1_time": {
+        "name": "Undervoltage Protection L1 Time"
+      },
+      "uvp_l2": {
+        "name": "Undervoltage Protection L2"
+      },
+      "uvp_l2_time": {
+        "name": "Undervoltage Protection L2 Time"
+      },
+      "uvp_l3": {
+        "name": "Undervoltage Protection L3"
+      },
+      "uvp_l3_time": {
+        "name": "Undervoltage Protection L3 Time"
+      },
+      "ofp_l1": {
+        "name": "Overfrequency Protection L1"
+      },
+      "ofp_l1_time": {
+        "name": "Overfrequency Protection L1 Time"
+      },
+      "ofp_l2": {
+        "name": "Overfrequency Protection L2"
+      },
+      "ofp_l2_time": {
+        "name": "Overfrequency Protection L2 Time"
+      },
+      "ofp_l3": {
+        "name": "Overfrequency Protection L3"
+      },
+      "ofp_l3_time": {
+        "name": "Overfrequency Protection L3 Time"
+      },
+      "ufp_l1": {
+        "name": "Underfrequency Protection L1"
+      },
+      "ufp_l1_time": {
+        "name": "Underfrequency Protection L1 Time"
+      },
+      "ufp_l2": {
+        "name": "Underfrequency Protection L2"
+      },
+      "ufp_l2_time": {
+        "name": "Underfrequency Protection L2 Time"
+      },
+      "ufp_l3": {
+        "name": "Underfrequency Protection L3"
+      },
+      "ufp_l3_time": {
+        "name": "Underfrequency Protection L3 Time"
+      },
+      "soc_battery": {
+        "name": "Battery State of Charge"
+      },
+      "soh_battery": {
+        "name": "Battery State of Health"
+      },
+      "battery_status": {
+        "name": "Battery Status"
+      },
+      "battery_voltage": {
+        "name": "Battery Voltage"
+      },
+      "battery_current": {
+        "name": "Battery Current"
+      },
+      "battery_min_cell_temp": {
+        "name": "Battery Min Cell Temp"
+      },
+      "battery_max_cell_temp": {
+        "name": "Battery Max Cell Temp"
+      },
+      "battery_max_charge_current": {
+        "name": "Battery Max Charge Current"
+      },
+      "battery_max_discharge_current": {
+        "name": "Battery Max Discharge Current"
+      },
+      "battery_remaining_time_raw": {
+        "name": "Battery Remaining Time (raw)"
+      },
+      "battery_relay_status": {
+        "name": "Battery Relay Status"
+      },
+      "battery_min_cell_voltage": {
+        "name": "Battery Min Cell Voltage"
+      },
+      "battery_max_cell_voltage": {
+        "name": "Battery Max Cell Voltage"
+      },
+      "battery_charge_cutoff_voltage": {
+        "name": "Battery Charge Cutoff Voltage"
+      },
+      "battery_discharge_cutoff_voltage": {
+        "name": "Battery Discharge Cutoff Voltage"
+      },
+      "battery_module_count": {
+        "name": "Battery Module Count"
+      },
+      "battery_capacity_kwh": {
+        "name": "Battery Capacity"
+      },
+      "battery_type": {
+        "name": "Battery Type"
+      },
+      "max_feed_to_grid": {
+        "name": "Max Feed to Grid"
+      },
+      "pv_capacity_storage": {
+        "name": "PV Capacity Storage"
+      },
+      "pv_capacity_grid_inverter": {
+        "name": "PV Capacity of Grid Inverter"
+      },
+      "ct_rate_grid_meter": {
+        "name": "CT Rate Grid Meter"
+      },
+      "ct_rate_pv_meter": {
+        "name": "CT Rate PV Meter"
+      },
+      "charging_time_period_control": {
+        "name": "Charging Time Period Control"
+      },
+      "charging_cutoff_soc": {
+        "name": "Charging Cutoff SoC"
+      },
+      "charging_period_1_start_hour": {
+        "name": "Charging Period 1 Start Hour"
+      },
+      "charging_period_1_stop_hour": {
+        "name": "Charging Period 1 Stop Hour"
+      },
+      "charging_period_2_start_hour": {
+        "name": "Charging Period 2 Start Hour"
+      },
+      "charging_period_2_stop_hour": {
+        "name": "Charging Period 2 Stop Hour"
+      },
+      "charging_period_1_start_minute": {
+        "name": "Charging Period 1 Start Minute"
+      },
+      "charging_period_1_stop_minute": {
+        "name": "Charging Period 1 Stop Minute"
+      },
+      "charging_period_2_start_minute": {
+        "name": "Charging Period 2 Start Minute"
+      },
+      "charging_period_2_stop_minute": {
+        "name": "Charging Period 2 Stop Minute"
+      },
+      "discharging_cutoff_soc": {
+        "name": "Discharging Cutoff SoC"
+      },
+      "discharging_period_1_start_hour": {
+        "name": "Discharging Period 1 Start Hour"
+      },
+      "discharging_period_1_stop_hour": {
+        "name": "Discharging Period 1 Stop Hour"
+      },
+      "discharging_period_2_start_hour": {
+        "name": "Discharging Period 2 Start Hour"
+      },
+      "discharging_period_2_stop_hour": {
+        "name": "Discharging Period 2 Stop Hour"
+      },
+      "discharging_period_1_start_minute": {
+        "name": "Discharging Period 1 Start Minute"
+      },
+      "discharging_period_1_stop_minute": {
+        "name": "Discharging Period 1 Stop Minute"
+      },
+      "discharging_period_2_start_minute": {
+        "name": "Discharging Period 2 Start Minute"
+      },
+      "discharging_period_2_stop_minute": {
+        "name": "Discharging Period 2 Stop Minute"
+      },
+      "dispatch_start": {
+        "name": "Dispatch Start"
+      },
+      "dispatch_active_power": {
+        "name": "Dispatch Active Power"
+      },
+      "dispatch_reactive_power": {
+        "name": "Dispatch Reactive Power"
+      },
+      "dispatch_mode": {
+        "name": "Dispatch Mode"
+      },
+      "dispatch_soc": {
+        "name": "Dispatch SoC"
+      },
+      "dispatch_time": {
+        "name": "Dispatch Time"
+      },
+      "dispatch_energy_flow_direction": {
+        "name": "Dispatch Energy Flow Direction"
+      },
+      "dispatch_pv_switch": {
+        "name": "Dispatch PV Switch"
+      },
+      "freq_dispatch_flag": {
+        "name": "Freq Dispatch Flag"
+      },
+      "freq_dispatch_power": {
+        "name": "Freq Dispatch Power"
+      },
+      "freq_dispatch_frequency": {
+        "name": "Freq Dispatch Frequency"
+      },
+      "current_pv_production": {
+        "name": "Current PV Production"
+      },
+      "current_house_load": {
+        "name": "Current House Load"
+      },
+      "battery_remaining_time": {
+        "name": "Battery Remaining Time"
+      },
+      "excess_power": {
+        "name": "Excess Power"
+      },
+      "battery_full": {
+        "name": "Battery Full"
+      },
+      "total_house_load": {
+        "name": "Total House Load"
+      },
+      "ems_version": {
+        "name": "EMS Version"
       }
     },
     "button": {
@@ -202,6 +713,32 @@
       },
       "reset_energy_totals": {
         "name": "Reset Energy Totals"
+      }
+    },
+    "time": {
+      "charging_period_1_start": {
+        "name": "Charging Period 1 Start Time"
+      },
+      "charging_period_1_stop": {
+        "name": "Charging Period 1 Stop Time"
+      },
+      "charging_period_2_start": {
+        "name": "Charging Period 2 Start Time"
+      },
+      "charging_period_2_stop": {
+        "name": "Charging Period 2 Stop Time"
+      },
+      "discharging_period_1_start": {
+        "name": "Discharging Period 1 Start Time"
+      },
+      "discharging_period_1_stop": {
+        "name": "Discharging Period 1 Stop Time"
+      },
+      "discharging_period_2_start": {
+        "name": "Discharging Period 2 Start Time"
+      },
+      "discharging_period_2_stop": {
+        "name": "Discharging Period 2 Stop Time"
       }
     }
   }

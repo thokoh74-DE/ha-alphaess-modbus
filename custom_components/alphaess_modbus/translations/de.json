@@ -1,0 +1,745 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "AlphaESS Modbus TCP",
+        "description": "Verbinde dich mit deinem AlphaESS-Wechselrichter über Modbus TCP. Stelle sicher, dass der Wechselrichter im lokalen Netzwerk erreichbar ist.",
+        "data": {
+          "host": "Wechselrichter-IP-Adresse",
+          "port": "Modbus-Port",
+          "slave_id": "Slave-ID"
+        }
+      },
+      "reconfigure": {
+        "title": "AlphaESS Modbus TCP neu konfigurieren",
+        "description": "Aktualisiere die Verbindungseinstellungen für deinen AlphaESS-Wechselrichter. Vor dem Speichern wird ein Verbindungstest durchgeführt.",
+        "data": {
+          "host": "Wechselrichter-IP-Adresse",
+          "port": "Modbus-Port",
+          "slave_id": "Slave-ID"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zum Wechselrichter nicht möglich. Prüfe IP-Adresse, Port und ob Modbus TCP am Wechselrichter aktiviert ist."
+    },
+    "abort": {
+      "already_configured": "Dieser Wechselrichter ist bereits konfiguriert.",
+      "reconfigure_successful": "Verbindungseinstellungen erfolgreich aktualisiert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Abfragegeschwindigkeit",
+        "description": "Lege fest, wie häufig die Integration den Wechselrichter abfragt. Der Modus „Langsam“ reduziert die Transaktionsrate für RS485-Adapter, die zu Timeouts neigen. Der Modus „Schnell“ setzt das Abfrageintervall direkt in Sekunden und skaliert alle Sensor-Abfrageintervalle um denselben Faktor.",
+        "data": {
+          "poll_mode": "Abfragemodus",
+          "slow_multiplier": "Intervall-Multiplikator (langsamer Modus)",
+          "fast_multiplier": "Abfrageintervall schneller Modus (s)",
+          "model_variant": "Wechselrichter-Modellvariante"
+        },
+        "data_description": {
+          "poll_mode": "Langsam (3-fache Dauer), Normal (Standard) oder Schnell. Im schnellen Modus läuft die Schleife direkt mit dem angegebenen Intervallwert, d. h. 0,1 ergibt eine 100-ms-Schleife und 10 Abfragen pro Sekunde für 1-Sekunden-Sensoren.",
+          "slow_multiplier": "Multiplikator, der im langsamen Modus auf alle Abfrageintervalle angewendet wird (Standard 3,0, Bereich 0,25-10,0).",
+          "fast_multiplier": "Legt das Abfrageintervall der Koordinator-Schleife in Sekunden fest und skaliert alle Sensor-Abfrageintervalle um denselben Faktor. Bei 0,1 läuft die Schleife alle 100 ms, und 1-Sekunden-Sensoren werden 10-mal pro Sekunde abgefragt. Werte unter 0,25 werden nur für direkte Modbus-TCP-Verbindungen empfohlen – RS485-Adapter kommen damit in der Regel nicht zurecht und können Timeouts verursachen.",
+          "model_variant": "Wähle „Standard“ für die meisten Wechselrichter. Wähle „SMILE-B3 / SMILE-B3-PLUS“, wenn dein Wechselrichter ein SMILE-B3 oder SMILE-B3-PLUS ist – diese Modelle verwenden andere Skalierungsfaktoren für Spannungs- und Wechselrichterleistungsregister."
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "excess_export_pause": {
+        "name": "Überschusseinspeisung – Pausiert"
+      },
+      "force_import_pause": {
+        "name": "Erzwungener Netzbezug – Pausiert"
+      }
+    },
+    "switch": {
+      "force_charging": {
+        "name": "Erzwungenes Laden"
+      },
+      "force_charging_hold": {
+        "name": "Erzwungenes Laden – Halten"
+      },
+      "force_discharging": {
+        "name": "Erzwungenes Entladen"
+      },
+      "force_discharging_hold": {
+        "name": "Erzwungenes Entladen – Halten"
+      },
+      "force_export": {
+        "name": "Erzwungene Einspeisung"
+      },
+      "force_export_hold": {
+        "name": "Erzwungene Einspeisung – Halten"
+      },
+      "dispatch": {
+        "name": "Direktsteuerung"
+      },
+      "excess_export": {
+        "name": "Überschusseinspeisung"
+      },
+      "force_import": {
+        "name": "Erzwungener Netzbezug"
+      },
+      "force_import_hold": {
+        "name": "Erzwungener Netzbezug – Halten"
+      },
+      "dispatch_pv": {
+        "name": "Direktsteuerung – PV aktiviert"
+      }
+    },
+    "number": {
+      "charging_cutoff_soc": {
+        "name": "Ladeabschaltung SoC"
+      },
+      "discharging_cutoff_soc": {
+        "name": "Entladeabschaltung SoC"
+      },
+      "max_feed_to_grid": {
+        "name": "Maximale Netzeinspeisung"
+      },
+      "force_charging_power": {
+        "name": "Erzwungene Ladeleistung"
+      },
+      "force_charging_cutoff_soc": {
+        "name": "Erzwungenes Laden – Stopp-SoC"
+      },
+      "force_charging_duration": {
+        "name": "Erzwungenes Laden – Dauer"
+      },
+      "force_discharging_power": {
+        "name": "Erzwungene Entladeleistung"
+      },
+      "force_discharging_cutoff_soc": {
+        "name": "Erzwungenes Entladen – Stopp-SoC"
+      },
+      "force_discharging_duration": {
+        "name": "Erzwungenes Entladen – Dauer"
+      },
+      "force_export_power": {
+        "name": "Erzwungene Einspeiseleistung"
+      },
+      "force_export_cutoff_soc": {
+        "name": "Erzwungene Einspeisung – Stopp-SoC"
+      },
+      "force_export_duration": {
+        "name": "Erzwungene Einspeisung – Dauer"
+      },
+      "dispatch_power": {
+        "name": "Direktsteuerung – Leistung"
+      },
+      "dispatch_cutoff_soc": {
+        "name": "Direktsteuerung – Stopp-SoC"
+      },
+      "dispatch_duration": {
+        "name": "Direktsteuerung – Dauer"
+      },
+      "force_import_power": {
+        "name": "Erzwungene Netzbezugsleistung"
+      },
+      "force_import_cutoff_soc": {
+        "name": "Erzwungener Netzbezug – Stopp-SoC"
+      },
+      "force_import_duration": {
+        "name": "Erzwungener Netzbezug – Dauer"
+      }
+    },
+    "select": {
+      "charging_discharging_settings": {
+        "name": "Lade-/Entladeeinstellungen"
+      },
+      "dispatch_mode": {
+        "name": "Direktsteuerungsmodus"
+      },
+      "inverter_ac_limit": {
+        "name": "Wechselrichter-AC-Grenzwert"
+      }
+    },
+    "sensor": {
+      "dispatch_countdown": {
+        "name": "Direktsteuerung Restzeit"
+      },
+      "force_charging_countdown": {
+        "name": "Erzwungenes Laden – Countdown"
+      },
+      "force_discharging_countdown": {
+        "name": "Erzwungenes Entladen – Countdown"
+      },
+      "force_export_countdown": {
+        "name": "Erzwungene Einspeisung – Countdown"
+      },
+      "force_import_countdown": {
+        "name": "Erzwungener Netzbezug – Countdown"
+      },
+      "today_energy_feed_to_grid": {
+        "name": "Heutige Netzeinspeisung"
+      },
+      "today_energy_from_grid": {
+        "name": "Heutiger Netzbezug"
+      },
+      "today_pv_generation": {
+        "name": "Heutige PV-Erzeugung"
+      },
+      "today_battery_charged": {
+        "name": "Heute geladen (Batterie)"
+      },
+      "today_battery_discharged": {
+        "name": "Heute entladen (Batterie)"
+      },
+      "today_battery_charged_from_grid": {
+        "name": "Heute aus dem Netz geladen (Batterie)"
+      },
+      "today_s_house_load": {
+        "name": "Heutige Hauslast"
+      },
+      "inverter_grid_frequency": {
+        "name": "Netzfrequenz"
+      },
+      "inverter_temperature": {
+        "name": "Wechselrichtertemperatur"
+      },
+      "inverter_work_mode": {
+        "name": "Wechselrichter-Betriebsmodus"
+      },
+      "inverter_sn": {
+        "name": "Wechselrichter-Seriennummer"
+      },
+      "bms_version": {
+        "name": "BMS-Version"
+      },
+      "lmu_version": {
+        "name": "LMU-Version"
+      },
+      "iso_version": {
+        "name": "ISO-Version"
+      },
+      "inverter_version": {
+        "name": "Wechselrichter-Version"
+      },
+      "inverter_arm_version": {
+        "name": "Wechselrichter-ARM-Version"
+      },
+      "ems_version_high": {
+        "name": "EMS-Version Hoch"
+      },
+      "ems_version_middle": {
+        "name": "EMS-Version Mitte"
+      },
+      "ems_version_low": {
+        "name": "EMS-Version Niedrig"
+      },
+      "ems_version_low_suffix": {
+        "name": "EMS-Version Niedrig-Suffix"
+      },
+      "system_time_yymm": {
+        "name": "Systemzeit JJMM"
+      },
+      "system_time_ddhh": {
+        "name": "Systemzeit TTHH"
+      },
+      "system_time_mmss": {
+        "name": "Systemzeit MMSS"
+      },
+      "modbus_baud_rate": {
+        "name": "Modbus-Baudrate"
+      },
+      "ip_method": {
+        "name": "IP-Methode"
+      },
+      "local_ip": {
+        "name": "Lokale IP-Adresse"
+      },
+      "subnet_mask": {
+        "name": "Subnetzmaske"
+      },
+      "gateway": {
+        "name": "Gateway"
+      },
+      "power_grid": {
+        "name": "Netzleistung"
+      },
+      "power_phase_a_grid": {
+        "name": "Netzleistung Phase A"
+      },
+      "power_phase_b_grid": {
+        "name": "Netzleistung Phase B"
+      },
+      "power_phase_c_grid": {
+        "name": "Netzleistung Phase C"
+      },
+      "voltage_phase_a_grid": {
+        "name": "Netzspannung Phase A"
+      },
+      "voltage_phase_b_grid": {
+        "name": "Netzspannung Phase B"
+      },
+      "voltage_phase_c_grid": {
+        "name": "Netzspannung Phase C"
+      },
+      "power_battery": {
+        "name": "Batterieleistung"
+      },
+      "power_inverter_l1": {
+        "name": "Wechselrichterleistung L1"
+      },
+      "power_inverter_l2": {
+        "name": "Wechselrichterleistung L2"
+      },
+      "power_inverter_l3": {
+        "name": "Wechselrichterleistung L3"
+      },
+      "power_inverter": {
+        "name": "Wechselrichterleistung"
+      },
+      "backup_power_inverter_l1": {
+        "name": "Backup-Wechselrichterleistung L1"
+      },
+      "backup_power_inverter_l2": {
+        "name": "Backup-Wechselrichterleistung L2"
+      },
+      "backup_power_inverter_l3": {
+        "name": "Backup-Wechselrichterleistung L3"
+      },
+      "backup_power_inverter": {
+        "name": "Backup-Wechselrichterleistung"
+      },
+      "active_power_pv_meter": {
+        "name": "Wirkleistung PV-Zähler"
+      },
+      "pv1_power": {
+        "name": "PV-Strang 1 Leistung"
+      },
+      "pv1_voltage": {
+        "name": "PV-Strang 1 Spannung"
+      },
+      "pv1_current": {
+        "name": "PV-Strang 1 Strom"
+      },
+      "pv2_power": {
+        "name": "PV-Strang 2 Leistung"
+      },
+      "pv2_voltage": {
+        "name": "PV-Strang 2 Spannung"
+      },
+      "pv2_current": {
+        "name": "PV-Strang 2 Strom"
+      },
+      "pv3_power": {
+        "name": "PV-Strang 3 Leistung"
+      },
+      "pv3_voltage": {
+        "name": "PV-Strang 3 Spannung"
+      },
+      "pv3_current": {
+        "name": "PV-Strang 3 Strom"
+      },
+      "pv4_power": {
+        "name": "PV-Strang 4 Leistung"
+      },
+      "pv4_voltage": {
+        "name": "PV-Strang 4 Spannung"
+      },
+      "pv4_current": {
+        "name": "PV-Strang 4 Strom"
+      },
+      "pv_total_power": {
+        "name": "PV-Gesamtleistung (Wechselrichter)"
+      },
+      "total_energy_feed_to_grid_meter": {
+        "name": "Gesamte Netzeinspeisung (Zähler)"
+      },
+      "total_energy_consumption_from_grid_meter": {
+        "name": "Gesamter Netzbezug (Zähler)"
+      },
+      "total_energy_feed_to_grid_pv": {
+        "name": "Gesamte Netzeinspeisung (PV)"
+      },
+      "total_energy_charge_battery": {
+        "name": "Gesamte Batterieladung"
+      },
+      "total_energy_discharge_battery": {
+        "name": "Gesamte Batterieentladung"
+      },
+      "total_energy_charge_battery_from_grid": {
+        "name": "Gesamte Batterieladung aus dem Netz"
+      },
+      "total_energy_from_pv": {
+        "name": "Gesamte PV-Energie"
+      },
+      "pv_inverter_energy": {
+        "name": "PV-Wechselrichterenergie"
+      },
+      "pv_system_total_energy": {
+        "name": "PV-Systemgesamtenergie"
+      },
+      "system_fault": {
+        "name": "Systemfehler"
+      },
+      "inverter_warning_1": {
+        "name": "Wechselrichterwarnung 1"
+      },
+      "inverter_warning_2": {
+        "name": "Wechselrichterwarnung 2"
+      },
+      "inverter_fault_1": {
+        "name": "Wechselrichterfehler 1"
+      },
+      "inverter_fault_2": {
+        "name": "Wechselrichterfehler 2"
+      },
+      "battery_warning": {
+        "name": "Batteriewarnung"
+      },
+      "battery_fault": {
+        "name": "Batteriefehler"
+      },
+      "battery_1_warning": {
+        "name": "Batterie 1 Warnung"
+      },
+      "battery_2_warning": {
+        "name": "Batterie 2 Warnung"
+      },
+      "battery_3_warning": {
+        "name": "Batterie 3 Warnung"
+      },
+      "battery_4_warning": {
+        "name": "Batterie 4 Warnung"
+      },
+      "battery_5_warning": {
+        "name": "Batterie 5 Warnung"
+      },
+      "battery_6_warning": {
+        "name": "Batterie 6 Warnung"
+      },
+      "battery_1_fault": {
+        "name": "Batterie 1 Fehler"
+      },
+      "battery_2_fault": {
+        "name": "Batterie 2 Fehler"
+      },
+      "battery_3_fault": {
+        "name": "Batterie 3 Fehler"
+      },
+      "battery_4_fault": {
+        "name": "Batterie 4 Fehler"
+      },
+      "battery_5_fault": {
+        "name": "Batterie 5 Fehler"
+      },
+      "battery_6_fault": {
+        "name": "Batterie 6 Fehler"
+      },
+      "grid_regulation": {
+        "name": "Netzregelung"
+      },
+      "ovp_l1": {
+        "name": "Überspannungsschutz L1"
+      },
+      "ovp_l1_time": {
+        "name": "Überspannungsschutz L1 Zeit"
+      },
+      "ovp_l2": {
+        "name": "Überspannungsschutz L2"
+      },
+      "ovp_l2_time": {
+        "name": "Überspannungsschutz L2 Zeit"
+      },
+      "ovp_l3": {
+        "name": "Überspannungsschutz L3"
+      },
+      "ovp_l3_time": {
+        "name": "Überspannungsschutz L3 Zeit"
+      },
+      "ovp10": {
+        "name": "Überspannungsschutz 10min"
+      },
+      "ovp10_time": {
+        "name": "Überspannungsschutz 10min Zeit"
+      },
+      "uvp_l1": {
+        "name": "Unterspannungsschutz L1"
+      },
+      "uvp_l1_time": {
+        "name": "Unterspannungsschutz L1 Zeit"
+      },
+      "uvp_l2": {
+        "name": "Unterspannungsschutz L2"
+      },
+      "uvp_l2_time": {
+        "name": "Unterspannungsschutz L2 Zeit"
+      },
+      "uvp_l3": {
+        "name": "Unterspannungsschutz L3"
+      },
+      "uvp_l3_time": {
+        "name": "Unterspannungsschutz L3 Zeit"
+      },
+      "ofp_l1": {
+        "name": "Überfrequenzschutz L1"
+      },
+      "ofp_l1_time": {
+        "name": "Überfrequenzschutz L1 Zeit"
+      },
+      "ofp_l2": {
+        "name": "Überfrequenzschutz L2"
+      },
+      "ofp_l2_time": {
+        "name": "Überfrequenzschutz L2 Zeit"
+      },
+      "ofp_l3": {
+        "name": "Überfrequenzschutz L3"
+      },
+      "ofp_l3_time": {
+        "name": "Überfrequenzschutz L3 Zeit"
+      },
+      "ufp_l1": {
+        "name": "Unterfrequenzschutz L1"
+      },
+      "ufp_l1_time": {
+        "name": "Unterfrequenzschutz L1 Zeit"
+      },
+      "ufp_l2": {
+        "name": "Unterfrequenzschutz L2"
+      },
+      "ufp_l2_time": {
+        "name": "Unterfrequenzschutz L2 Zeit"
+      },
+      "ufp_l3": {
+        "name": "Unterfrequenzschutz L3"
+      },
+      "ufp_l3_time": {
+        "name": "Unterfrequenzschutz L3 Zeit"
+      },
+      "soc_battery": {
+        "name": "Batterie-Ladezustand"
+      },
+      "soh_battery": {
+        "name": "Batterie-Gesundheitszustand"
+      },
+      "battery_status": {
+        "name": "Batteriestatus"
+      },
+      "battery_voltage": {
+        "name": "Batteriespannung"
+      },
+      "battery_current": {
+        "name": "Batteriestrom"
+      },
+      "battery_min_cell_temp": {
+        "name": "Batterie Min. Zelltemperatur"
+      },
+      "battery_max_cell_temp": {
+        "name": "Batterie Max. Zelltemperatur"
+      },
+      "battery_max_charge_current": {
+        "name": "Batterie Max. Ladestrom"
+      },
+      "battery_max_discharge_current": {
+        "name": "Batterie Max. Entladestrom"
+      },
+      "battery_remaining_time_raw": {
+        "name": "Batterie Restlaufzeit (roh)"
+      },
+      "battery_relay_status": {
+        "name": "Batterie-Relaisstatus"
+      },
+      "battery_min_cell_voltage": {
+        "name": "Batterie Min. Zellspannung"
+      },
+      "battery_max_cell_voltage": {
+        "name": "Batterie Max. Zellspannung"
+      },
+      "battery_charge_cutoff_voltage": {
+        "name": "Batterie Ladeabschaltspannung"
+      },
+      "battery_discharge_cutoff_voltage": {
+        "name": "Batterie Entladeabschaltspannung"
+      },
+      "battery_module_count": {
+        "name": "Anzahl Batteriemodule"
+      },
+      "battery_capacity_kwh": {
+        "name": "Batteriekapazität"
+      },
+      "battery_type": {
+        "name": "Batterietyp"
+      },
+      "max_feed_to_grid": {
+        "name": "Maximale Netzeinspeisung"
+      },
+      "pv_capacity_storage": {
+        "name": "PV-Kapazität Speicher"
+      },
+      "pv_capacity_grid_inverter": {
+        "name": "PV-Kapazität Netzwechselrichter"
+      },
+      "ct_rate_grid_meter": {
+        "name": "CT-Verhältnis Netzzähler"
+      },
+      "ct_rate_pv_meter": {
+        "name": "CT-Verhältnis PV-Zähler"
+      },
+      "charging_time_period_control": {
+        "name": "Ladezeitfenster-Steuerung"
+      },
+      "charging_cutoff_soc": {
+        "name": "Ladeabschaltung SoC"
+      },
+      "charging_period_1_start_hour": {
+        "name": "Ladezeitfenster 1 Start Stunde"
+      },
+      "charging_period_1_stop_hour": {
+        "name": "Ladezeitfenster 1 Ende Stunde"
+      },
+      "charging_period_2_start_hour": {
+        "name": "Ladezeitfenster 2 Start Stunde"
+      },
+      "charging_period_2_stop_hour": {
+        "name": "Ladezeitfenster 2 Ende Stunde"
+      },
+      "charging_period_1_start_minute": {
+        "name": "Ladezeitfenster 1 Start Minute"
+      },
+      "charging_period_1_stop_minute": {
+        "name": "Ladezeitfenster 1 Ende Minute"
+      },
+      "charging_period_2_start_minute": {
+        "name": "Ladezeitfenster 2 Start Minute"
+      },
+      "charging_period_2_stop_minute": {
+        "name": "Ladezeitfenster 2 Ende Minute"
+      },
+      "discharging_cutoff_soc": {
+        "name": "Entladeabschaltung SoC"
+      },
+      "discharging_period_1_start_hour": {
+        "name": "Entladezeitfenster 1 Start Stunde"
+      },
+      "discharging_period_1_stop_hour": {
+        "name": "Entladezeitfenster 1 Ende Stunde"
+      },
+      "discharging_period_2_start_hour": {
+        "name": "Entladezeitfenster 2 Start Stunde"
+      },
+      "discharging_period_2_stop_hour": {
+        "name": "Entladezeitfenster 2 Ende Stunde"
+      },
+      "discharging_period_1_start_minute": {
+        "name": "Entladezeitfenster 1 Start Minute"
+      },
+      "discharging_period_1_stop_minute": {
+        "name": "Entladezeitfenster 1 Ende Minute"
+      },
+      "discharging_period_2_start_minute": {
+        "name": "Entladezeitfenster 2 Start Minute"
+      },
+      "discharging_period_2_stop_minute": {
+        "name": "Entladezeitfenster 2 Ende Minute"
+      },
+      "dispatch_start": {
+        "name": "Direktsteuerung Start"
+      },
+      "dispatch_active_power": {
+        "name": "Direktsteuerung Wirkleistung"
+      },
+      "dispatch_reactive_power": {
+        "name": "Direktsteuerung Blindleistung"
+      },
+      "dispatch_mode": {
+        "name": "Direktsteuerungsmodus"
+      },
+      "dispatch_soc": {
+        "name": "Direktsteuerung SoC"
+      },
+      "dispatch_time": {
+        "name": "Direktsteuerung Zeit"
+      },
+      "dispatch_energy_flow_direction": {
+        "name": "Direktsteuerung Energieflussrichtung"
+      },
+      "dispatch_pv_switch": {
+        "name": "Direktsteuerung PV-Schalter"
+      },
+      "freq_dispatch_flag": {
+        "name": "Frequenz-Direktsteuerung Kennzeichen"
+      },
+      "freq_dispatch_power": {
+        "name": "Frequenz-Direktsteuerung Leistung"
+      },
+      "freq_dispatch_frequency": {
+        "name": "Frequenz-Direktsteuerung Frequenz"
+      },
+      "current_pv_production": {
+        "name": "Aktuelle PV-Erzeugung"
+      },
+      "current_house_load": {
+        "name": "Aktuelle Hauslast"
+      },
+      "battery_remaining_time": {
+        "name": "Batterie Restlaufzeit"
+      },
+      "excess_power": {
+        "name": "Überschussleistung"
+      },
+      "battery_full": {
+        "name": "Batterie voll"
+      },
+      "total_house_load": {
+        "name": "Gesamte Hauslast"
+      },
+      "ems_version": {
+        "name": "EMS-Version"
+      }
+    },
+    "button": {
+      "dispatch_reset": {
+        "name": "Direktsteuerung zurücksetzen"
+      },
+      "synchronise_date_time": {
+        "name": "Datum & Uhrzeit synchronisieren"
+      },
+      "sync_dispatch_state": {
+        "name": "Direktsteuerungsstatus synchronisieren"
+      },
+      "restart_pcs": {
+        "name": "PCS neu starten"
+      },
+      "restart_ems": {
+        "name": "EMS neu starten"
+      },
+      "reset_energy_totals": {
+        "name": "Energiezähler zurücksetzen"
+      }
+    },
+    "time": {
+      "charging_period_1_start": {
+        "name": "Ladezeitfenster 1 Startzeit"
+      },
+      "charging_period_1_stop": {
+        "name": "Ladezeitfenster 1 Endzeit"
+      },
+      "charging_period_2_start": {
+        "name": "Ladezeitfenster 2 Startzeit"
+      },
+      "charging_period_2_stop": {
+        "name": "Ladezeitfenster 2 Endzeit"
+      },
+      "discharging_period_1_start": {
+        "name": "Entladezeitfenster 1 Startzeit"
+      },
+      "discharging_period_1_stop": {
+        "name": "Entladezeitfenster 1 Endzeit"
+      },
+      "discharging_period_2_start": {
+        "name": "Entladezeitfenster 2 Startzeit"
+      },
+      "discharging_period_2_stop": {
+        "name": "Entladezeitfenster 2 Endzeit"
+      }
+    }
+  }
+}

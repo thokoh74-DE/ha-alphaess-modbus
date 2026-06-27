@@ -22,7 +22,6 @@ async def async_setup_entry(
 
 class AlphaESSExcessExportPauseSensor(BinarySensorEntity):
     _attr_has_entity_name = True
-    _attr_name = "Excess Export Pause"
     _attr_icon = "mdi:pause-circle"
     _attr_translation_key = "excess_export_pause"
 
@@ -47,7 +46,6 @@ class AlphaESSExcessExportPauseSensor(BinarySensorEntity):
 
 class AlphaESSForceImportPauseSensor(BinarySensorEntity):
     _attr_has_entity_name = True
-    _attr_name = "Force Import Pause"
     _attr_icon = "mdi:pause-circle"
     _attr_translation_key = "force_import_pause"
 

@@ -38,7 +38,7 @@ class AlphaESSTime(CoordinatorEntity[AlphaESSCoordinator], TimeEntity):
         super().__init__(coordinator)
         self._reg = reg
         self._attr_unique_id = f"{entry.entry_id}_{reg.key}"
-        self._attr_name = reg.name
+        self._attr_translation_key = reg.key
         self._attr_icon = reg.icon
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
 

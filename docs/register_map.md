@@ -119,6 +119,8 @@ Sensors are polled at the interval shown. Entries marked **off** in the Default 
 | 0x0122 | `total_energy_discharge_battery` | Total Energy Discharge Battery | Lifetime energy drawn from the battery | kWh | uint32 | x0.1 | 60 s | on |
 | 0x0124 | `total_energy_charge_battery_from_grid` | Total Energy Charge Battery from Grid | Lifetime energy used to charge the battery from the grid | kWh | uint32 | x0.1 | 60 s | on |
 | 0x043E | `total_energy_from_pv` | Total Energy from PV | Lifetime total PV energy generated | kWh | uint32 | x0.1 | 60 s | on |
+| 0x08D0 | `pv_inverter_energy` | PV Inverter Energy | Lifetime PV energy as reported by the inverter itself. Scale assumed 0.1 by analogy with the other uint32 energy totals on this map (0x0120, 0x0122, 0x0124, 0x043E) -- verify against the AlphaESS app/portal lifetime PV yield figure and adjust the scale in const.py if it's off by a factor of 10 | kWh | uint32 | x0.1 | 60 s | on |
+| 0x08D2 | `pv_system_total_energy` | PV System Total Energy | Lifetime PV energy for the whole system (inverter + any AC-coupled PV meter). Scale assumed 0.1, same caveat as PV Inverter Energy above -- verify and adjust if needed | kWh | uint32 | x0.1 | 60 s | on |
 
 ### Faults & Warnings
 

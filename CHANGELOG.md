@@ -1,5 +1,71 @@
 # Changelog
 
+### v1.15.2
+
+#### Bug fixes
+
+- German (and any future) entity translations now actually take effect. Home Assistant's rule is: if an entity sets an explicit `_attr_name`, that string is used outright and `_attr_translation_key` is never consulted — translations only apply when no explicit name is set. Every entity class in this integration (sensors, switches, numbers, selects, buttons, binary sensors, time entities) was setting both, so `translations/de.json` had no effect on any of them, including the entities that already had a working-looking `translation_key` before this fork touched anything. The explicit `_attr_name` is now removed everywhere a `translation_key` is set; English remains available as the automatic fallback via `strings.json`/`translations/en.json`, so nothing changes for English-language profiles.
+
+#### Upgrading from v1.15.1
+
+- No entities are renamed, removed, or added, and no unique IDs or entity IDs change, so existing automations, scripts, and dashboards keep working unchanged — only the displayed friendly name updates. After updating: restart Home Assistant (a config entry reload is not enough, since the translation file itself doesn't change, only the Python code that gates whether it's used), and if names still look stale in the browser, do a hard refresh (Ctrl+F5 / Cmd+Shift+R) — the frontend caches each integration's translation strings client-side and a normal reload doesn't always invalidate that cache.
+
+---
+
+### v1.15.1
+
+Brings this build up to date with upstream senalse/ha-alphaess-modbus v1.15.0-beta.3, on top of the Force Export PV-charging fix, the Sync Dispatch State persistence fix, and the six new sensors added in this fork's own v1.14.1/v1.15.0.
+
+#### What's new (from upstream v1.15.0-beta.1)
+
+- Connection settings (IP address, port, Slave ID) can now be changed without removing and re-adding the integration. A "Reconfigure" option appears in the three-dot menu on the AlphaESS card in Settings > Devices & Services.
+
+#### What's new (German translation)
+
+- Full German translation (`translations/de.json`) for every entity name across all platforms (sensor, switch, number, select, button, binary_sensor, time) -- 226 entity names plus the setup/reconfigure/options flow text. Home Assistant switches to it automatically when the user's profile language is set to German; English remains the fallback otherwise.
+- Two thirds of the entities (all ~159 register sensors, the 6 calculated sensors, and the EMS Version sensor) previously had no `translation_key` at all -- only a hardcoded English `_attr_name` -- so no translation file could ever have changed their displayed name. They now also set `translation_key`, same as the entities that already supported localization (switches, numbers, selects, buttons, the daily/countdown sensors). The English name remains as the fallback for any other language. The 8 time entities (charging/discharging period start/stop) had the same gap and got the same fix.
+
+#### Bug fixes (from upstream v1.15.0-beta.2/beta.3, adapted)
+
+- Force Export no longer auto-stops a few seconds after a low-SoC condition clears just because the battery is sitting near 0 W. Upstream's own fix for this (removing the separate battery-activity watchdog, since "battery near 0 W" is also the normal, legitimate state once PV covers the export target) is exactly the situation this fork's PV-charging fix made more common, so it was merged here too: the SoC-cutoff check in the Force Export servo loop is now the only auto-stop path, and it only ever fires while actually discharging (word > 32000), same as before.
+- Upstream's beta.2 fix had a side effect: it dropped the Force Export Hold gate on that SoC-cutoff check, so Hold stopped preventing the auto-off it was designed to prevent. beta.3's fix for that -- checking the Hold switch directly inside the SoC-cutoff check -- is merged here as well, combined with the discharge-only gating from this fork's PV-charging fix.
+
+#### Upgrading from v1.15.0
+
+- No entities are renamed, removed, or added beyond the six sensors already added in v1.15.0. The only behaviour changes are the new Reconfigure option, Force Export Hold working correctly again in the now-more-common "PV covers the export target, battery idle" case, and entity names displaying in German for users with German set as their Home Assistant profile language (no setting to enable -- it's automatic, and nothing changes for English-language profiles). Note that select dropdown option text (e.g. the Dispatch Mode choices) is not translated yet, only entity names; that would need a separate, more invasive change.
+
+---
+
+### v1.15.0
+
+#### What's new
+
+- Six new sensors, added for parity with the Hillview YAML package:
+  - `pv_inverter_energy` (0x08D0) and `pv_system_total_energy` (0x08D2) — two previously unused lifetime PV energy registers. Their scale is assumed to be 0.1 by analogy with the integration's other uint32 energy totals; this isn't independently confirmed against AlphaESS documentation, so compare the readings to the AlphaESS app/portal's lifetime PV yield and adjust the `scale` in `const.py` if either is off by a factor of 10.
+  - `total_house_load` — lifetime house-load energy, computed as grid import minus grid export minus battery charge plus battery discharge plus lifetime PV (mirrors Hillview's `AlphaESS_Total_House_Load`). Note this omits any AC-coupled PV-meter contribution, since this inverter family has no lifetime register for it; it's the best lifetime approximation the available registers allow.
+  - `today_s_house_load` — the same formula as `total_house_load`, reset daily at midnight, with the AC-coupled PV meter's live power Riemann-integrated in on top (same mechanism already used for `today_pv_generation`), so unlike the lifetime figure this one is exact for AC-coupled PV too.
+  - `excess_power` — PV output minus current house load, floored at 0 (mirrors `AlphaESS_Excess_Power`).
+  - `battery_full` — boolean, true when the raw battery status register reads 1 (mirrors `AlphaESS_Battery_Full`).
+
+#### Upgrading from v1.14.1
+
+- No existing entities are renamed, removed, or changed. The six new sensors appear automatically after updating; no configuration is required. As with any new uint32 register, give Home Assistant a poll cycle (up to 60 s) before the two new PV energy sensors show a value.
+
+---
+
+### v1.14.1
+
+#### Bug fixes
+
+- Force Export no longer blocks PV from charging the battery. The battery setpoint was floored at 0 W, so whenever solar production exceeded house load plus the export target, the integration commanded "no power" instead of "charge with the surplus" — the battery stopped charging from PV entirely for as long as Force Export was active, even with headroom left. The setpoint can now go negative (charge) the same way Force Export's house-load/PV feed-forward and the grid-error servo already go positive (discharge). The discharge-stop SoC is also now only applied while actually discharging; while PV is recharging the battery during Force Export, a SoC at or below that threshold no longer turns Force Export off.
+- Sync Dispatch State now correctly recognises Force Export after a Home Assistant restart even while it was charging the battery from PV surplus. It previously inferred the active switch purely from the sign of the live dispatch power (positive → Force Export, negative → Force Charging); since Force Export can now also write a negative/charging setpoint, that guess could misattribute a charging Force Export to Force Charging. The integration now also persists which switch was last active and prefers that record (when still consistent with the live power sign) over the sign-only guess.
+
+#### Upgrading from v1.14.0
+
+- No entities are renamed, removed, or added. Force Export behaves the same when discharging is needed; the only change is that PV surplus now reaches the battery instead of being held back while Force Export runs. The integration now also stores a small `.storage` file to remember which dispatch switch was last active across restarts, used only by Sync Dispatch State.
+
+---
+
 ### v1.14.0
 
 #### What's new

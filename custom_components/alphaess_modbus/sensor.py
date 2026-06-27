@@ -29,15 +29,48 @@ from .coordinator import AlphaESSCoordinator
 class CalculatedSensorDef:
     key: str
     name: str
-    unit: str
+    unit: str | None
     device_class: str | None
+    state_class: str | None = "measurement"
 
 
 CALCULATED_SENSORS: list[CalculatedSensorDef] = [
     CalculatedSensorDef("current_pv_production", "Current PV Production", "W", "power"),
     CalculatedSensorDef("current_house_load", "Current House Load", "W", "power"),
     CalculatedSensorDef("battery_remaining_time", "Battery Remaining Time", "min", "duration"),
+    CalculatedSensorDef("excess_power", "Excess Power", "W", "power"),
+    CalculatedSensorDef("battery_full", "Battery Full", None, None, state_class=None),
+    CalculatedSensorDef("total_house_load", "Total House Load", "kWh", "energy", state_class="total"),
 ]
+
+
+def _calc_total_house_load_kwh(d: dict) -> float | None:
+    """Lifetime house-load energy (kWh), mirroring Hillview's AlphaESS_Total_House_Load:
+
+        grid_import - grid_export - battery_charge + battery_discharge + lifetime_pv
+
+    NOTE: this inverter family has no lifetime register for AC-coupled PV-meter energy
+    (only a live power reading), so unlike Today's House Load -- which Riemann-integrates
+    that live power and is therefore exact -- this lifetime figure omits the AC-meter PV
+    contribution and will run slightly low for AC-coupled PV systems. It's the best
+    available lifetime approximation with the registers this inverter exposes.
+    """
+    keys = [
+        "total_energy_consumption_from_grid_meter",
+        "total_energy_feed_to_grid_meter",
+        "total_energy_charge_battery",
+        "total_energy_discharge_battery",
+        "total_energy_from_pv",
+    ]
+    if any(d.get(k) is None for k in keys):
+        return None
+    return (
+        float(d["total_energy_consumption_from_grid_meter"])
+        - float(d["total_energy_feed_to_grid_meter"])
+        - float(d["total_energy_charge_battery"])
+        + float(d["total_energy_discharge_battery"])
+        + float(d["total_energy_from_pv"])
+    )
 
 _DEVICE_CLASS_MAP = {
     "battery": SensorDeviceClass.BATTERY,
@@ -156,6 +189,13 @@ async def async_setup_entry(
         AlphaESSDailySensor(coordinator, entry, key, source_key, ac_power_key)
         for key, source_key, ac_power_key in DAILY_ENERGY_SENSORS
     ]
+    entities.append(
+        AlphaESSDailySensor(
+            coordinator, entry, "today_s_house_load",
+            value_fn=_calc_total_house_load_kwh,
+            ac_power_key="active_power_pv_meter",
+        )
+    )
     async_add_entities(entities)
 
 
@@ -171,7 +211,7 @@ class AlphaESSSensor(CoordinatorEntity[AlphaESSCoordinator], SensorEntity):
         super().__init__(coordinator)
         self._reg = reg
         self._attr_unique_id = f"{entry.entry_id}_{reg.key}"
-        self._attr_name = reg.name
+        self._attr_translation_key = reg.key
         self._attr_native_unit_of_measurement = reg.unit
         self._attr_device_class = _DEVICE_CLASS_MAP.get(reg.device_class or "")
         self._attr_state_class = _STATE_CLASS_MAP.get(reg.state_class or "")
@@ -194,7 +234,6 @@ class AlphaESSSensor(CoordinatorEntity[AlphaESSCoordinator], SensorEntity):
 
 class AlphaESSCalculatedSensor(CoordinatorEntity[AlphaESSCoordinator], SensorEntity):
     _attr_has_entity_name = True
-    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(
         self,
@@ -205,9 +244,10 @@ class AlphaESSCalculatedSensor(CoordinatorEntity[AlphaESSCoordinator], SensorEnt
         super().__init__(coordinator)
         self._defn = defn
         self._attr_unique_id = f"{entry.entry_id}_{defn.key}"
-        self._attr_name = defn.name
+        self._attr_translation_key = defn.key
         self._attr_native_unit_of_measurement = defn.unit
         self._attr_device_class = _DEVICE_CLASS_MAP.get(defn.device_class)
+        self._attr_state_class = _STATE_CLASS_MAP.get(defn.state_class or "")
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
 
     def _pv_production(self, d: dict) -> int | None:
@@ -215,6 +255,18 @@ class AlphaESSCalculatedSensor(CoordinatorEntity[AlphaESSCoordinator], SensorEnt
         if any(d.get(k) is None for k in keys):
             return None
         return max(0, sum(int(d[k]) for k in keys))
+
+    def _house_load(self, d: dict) -> int | None:
+        grid = d.get("power_grid")
+        if grid is None:
+            return None
+        if float(d.get("inverter_work_mode", 0)) == 2:
+            return round(float(grid))
+        pv = self._pv_production(d)
+        battery = d.get("power_battery")
+        if pv is None or battery is None:
+            return None
+        return max(0, int(pv) + int(battery) + int(grid))
 
     @property
     def native_value(self):
@@ -226,16 +278,24 @@ class AlphaESSCalculatedSensor(CoordinatorEntity[AlphaESSCoordinator], SensorEnt
             return self._pv_production(d)
 
         if self._defn.key == "current_house_load":
-            grid = d.get("power_grid")
-            if grid is None:
-                return None
-            if float(d.get("inverter_work_mode", 0)) == 2:
-                return round(float(grid))
+            return self._house_load(d)
+
+        if self._defn.key == "excess_power":
             pv = self._pv_production(d)
-            battery = d.get("power_battery")
-            if pv is None or battery is None:
+            house_load = self._house_load(d)
+            if pv is None or house_load is None:
                 return None
-            return max(0, int(pv) + int(battery) + int(grid))
+            return max(0, int(pv) - int(house_load))
+
+        if self._defn.key == "battery_full":
+            raw = d.get("battery_status")
+            if raw is None:
+                return None
+            return int(raw) == 1
+
+        if self._defn.key == "total_house_load":
+            value = _calc_total_house_load_kwh(d)
+            return round(value, 2) if value is not None else None
 
         if self._defn.key == "battery_remaining_time":
             raw = d.get("battery_remaining_time_raw")
@@ -271,7 +331,7 @@ class AlphaESSCombinedSensor(CoordinatorEntity[AlphaESSCoordinator], SensorEntit
     ) -> None:
         super().__init__(coordinator)
         self._keys = keys
-        self._attr_name = name
+        self._attr_translation_key = unique_id_suffix
         self._attr_unique_id = f"{entry.entry_id}_{unique_id_suffix}"
         self._attr_icon = icon
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
@@ -362,7 +422,6 @@ class AlphaESSModeCountdownSensor(CoordinatorEntity[AlphaESSCoordinator], Sensor
     ) -> None:
         super().__init__(coordinator)
         self._switch_key = switch_key
-        self._attr_name = name
         self._attr_unique_id = f"{entry.entry_id}_{switch_key}_countdown"
         self._attr_translation_key = f"{switch_key}_countdown"
         self._attr_icon = icon
@@ -411,11 +470,13 @@ class AlphaESSDailySensor(CoordinatorEntity[AlphaESSCoordinator], RestoreSensor)
         coordinator: AlphaESSCoordinator,
         entry: ConfigEntry,
         key: str,
-        source_key: str,
+        source_key: str | None = None,
         ac_power_key: str | None = None,
+        value_fn: Callable[[dict], float | None] | None = None,
     ) -> None:
         super().__init__(coordinator)
         self._source_key = source_key
+        self._value_fn = value_fn
         self._ac_power_key = ac_power_key
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_translation_key = key
@@ -425,6 +486,17 @@ class AlphaESSDailySensor(CoordinatorEntity[AlphaESSCoordinator], RestoreSensor)
         self._unsub_midnight: Callable | None = None
         self._ac_accumulated_kwh: float = 0.0
         self._last_ac_time: float | None = None
+
+    def _dc_value(self, d: dict) -> float | None:
+        """Current value of this sensor's source: either a raw register (source_key)
+        or a composite quantity supplied by value_fn (e.g. Today's House Load, which
+        is derived from several registers rather than a single one)."""
+        if self._value_fn is not None:
+            return self._value_fn(d)
+        if self._source_key is None:
+            return None
+        v = d.get(self._source_key)
+        return float(v) if v is not None else None
 
     def _handle_coordinator_update(self) -> None:
         if self._ac_power_key:
@@ -457,7 +529,7 @@ class AlphaESSDailySensor(CoordinatorEntity[AlphaESSCoordinator], RestoreSensor)
                     pass
 
         if not restored:
-            current = (self.coordinator.data or {}).get(self._source_key)
+            current = self._dc_value(self.coordinator.data or {})
             if current is not None:
                 self._day_start_value = float(current)
                 self._start_date = today
@@ -482,7 +554,7 @@ class AlphaESSDailySensor(CoordinatorEntity[AlphaESSCoordinator], RestoreSensor)
             self._unsub_midnight = None
 
     async def _reset_day(self, _now: datetime) -> None:
-        current = (self.coordinator.data or {}).get(self._source_key)
+        current = self._dc_value(self.coordinator.data or {})
         if current is not None:
             self._day_start_value = float(current)
             self._start_date = date.today()
@@ -495,7 +567,7 @@ class AlphaESSDailySensor(CoordinatorEntity[AlphaESSCoordinator], RestoreSensor)
     def native_value(self) -> float | None:
         if self._day_start_value is None:
             return None
-        current = (self.coordinator.data or {}).get(self._source_key)
+        current = self._dc_value(self.coordinator.data or {})
         if current is None:
             return None
         dc_kwh = max(0.0, float(current) - self._day_start_value)

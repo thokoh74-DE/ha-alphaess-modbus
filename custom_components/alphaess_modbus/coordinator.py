@@ -7,6 +7,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from pymodbus.exceptions import ModbusException
 
@@ -120,6 +121,30 @@ class AlphaESSCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.dispatch_started_at: datetime | None = None
         self.dispatch_duration_s: int = 0
         self.active_dispatch_key: str | None = None
+        # Persisted across restarts so Sync Dispatch State can correctly attribute a
+        # live dispatch found after HA restarts, instead of guessing purely from the
+        # sign of dispatch_active_power (which is no longer unique to one switch now
+        # that Force Export can also write a negative/charging setpoint).
+        self.restored_dispatch_key: str | None = None
+        self._dispatch_key_store = Store(
+            hass, 1, f"{DOMAIN}_{config_entry.entry_id}_dispatch_key"
+        )
+
+    async def async_load_restored_dispatch_key(self) -> None:
+        """Load the dispatch key persisted before the last shutdown/reload, if any."""
+        try:
+            stored = await self._dispatch_key_store.async_load()
+        except Exception:
+            stored = None
+        self.restored_dispatch_key = stored.get("key") if stored else None
+
+    async def async_set_active_dispatch_key(self, key: str | None) -> None:
+        """Set the in-memory active dispatch key and persist it for the next restart."""
+        self.active_dispatch_key = key
+        try:
+            await self._dispatch_key_store.async_save({"key": key})
+        except Exception:
+            _LOGGER.debug("Failed to persist active dispatch key", exc_info=True)
 
     def get_number(self, key: str) -> float | None:
         return self.numbers.get(key)
