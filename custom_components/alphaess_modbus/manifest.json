@@ -1,7 +1,6 @@
 {
   "domain": "alphaess_modbus",
   "name": "AlphaESS Modbus TCP",
-  "version": "1.15.3"
   "codeowners": [
     "@thokoh74-DE"
   ],
@@ -13,4 +12,5 @@
   "requirements": [
     "pymodbus>=3.7.4"
   ],
+  "version": "1.15.4"
 }
