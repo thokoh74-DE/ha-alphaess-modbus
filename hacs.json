@@ -2,5 +2,4 @@
   "name": "AlphaESS Modbus TCP",
   "content_in_root": false,
   "homeassistant": "2024.10.0"
-  "filename": "alphaess_modbus"
 }
