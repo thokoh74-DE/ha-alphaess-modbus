@@ -1,5 +1,27 @@
 # Changelog
 
+### v1.15.5
+
+#### Bug fix: dispatch reset now also sent on HA startup
+
+**EN**
+
+v1.15.3 added a reset on *shutdown* and *unload*, but missed the root cause: the inverter retains the last dispatch command in its own non-volatile memory across power cycles and HA restarts. If HA crashed (no clean shutdown), or if the startup reset was skipped for any reason, the inverter kept running the previous Force Export / Import / Charging command — visible as unexpected grid feed-in (e.g. 2 kW at night with no PV).
+
+v1.15.5 adds an **unconditional dispatch reset immediately after the first successful Modbus connection on startup**, before any switch state is restored. This is a safe no-op when no dispatch was active on the inverter. The reset is sent regardless of whether `active_dispatch_key` was persisted, because the inverter's own memory is the authoritative source — not HA's storage.
+
+**DE**
+
+v1.15.3 hat den Reset beim *Herunterfahren* und *Entladen* ergänzt, aber die eigentliche Ursache nicht behoben: Der Wechselrichter speichert den letzten Dispatch-Befehl in seinem eigenen nichtflüchtigen Speicher über Neustarts hinweg. Bei einem HA-Absturz (kein sauberer Shutdown) lief der Wechselrichter daher weiter im letzten Dispatch-Modus — sichtbar als unerwartete Netzeinspeisung (z.B. 2 kW nachts ohne PV).
+
+v1.15.5 sendet **unmittelbar nach dem ersten erfolgreichen Modbus-Verbindungsaufbau beim Start** einen unbedingten Dispatch-Reset, bevor Switch-Zustände wiederhergestellt werden. Das ist ein sicheres No-Op wenn kein Dispatch aktiv war. Der Reset wird unabhängig vom persistierten `active_dispatch_key` gesendet, da der Wechselrichter-Speicher die maßgebliche Quelle ist — nicht der HA-Storage.
+
+#### Upgrading from v1.15.4
+
+No entities are renamed, removed, or added. The only behaviour change is the unconditional dispatch reset on startup. After updating, restart Home Assistant.
+
+---
+
 ### v1.15.3
 
 #### What's new

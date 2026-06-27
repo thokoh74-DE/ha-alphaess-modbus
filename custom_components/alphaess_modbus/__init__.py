@@ -67,6 +67,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_load_restored_dispatch_key()
     await coordinator.async_config_entry_first_refresh()
 
+    # ── Startup reset ────────────────────────────────────────────────────────
+    # Always send a dispatch-reset immediately after the first successful
+    # connection.  The inverter retains the last dispatch command in its own
+    # memory across power cycles and HA restarts, so without this reset it
+    # will keep running (e.g. Force Export at 2 kW) even though HA has no
+    # active dispatch.  We send the reset unconditionally here — it is a
+    # safe no-op when no dispatch was active — and then clear the persisted
+    # dispatch key so switch states start clean.
+    try:
+        await coordinator.async_reset_dispatch()
+        await coordinator.async_set_active_dispatch_key(None)
+        _LOGGER.info(
+            "AlphaESS Modbus: dispatch reset sent on startup (inverter returned to self-consumption)"
+        )
+    except Exception:
+        _LOGGER.warning(
+            "AlphaESS Modbus: could not send dispatch reset on startup",
+            exc_info=True,
+        )
+    # ─────────────────────────────────────────────────────────────────────────
+
     raw_sn = (coordinator.data.get("inverter_sn") or "").strip().rstrip("\x00").strip()
     _model = _detect_model(raw_sn)
     _serial = raw_sn or None
