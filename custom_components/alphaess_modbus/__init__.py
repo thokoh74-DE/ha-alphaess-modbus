@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+import logging
 import re
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import EVENT_HOMEASSISTANT_STOP, HomeAssistant, ServiceCall
 from homeassistant.helpers import device_registry as dr
 
 from .config_flow import CONF_SLAVE_ID
 from .const import DOMAIN, PLATFORMS
 from .coordinator import AlphaESSCoordinator
 from .modbus_client import AlphaESSModbusClient
+
+_LOGGER = logging.getLogger(__name__)
 
 SERVICE_WRITE_REGISTER = "write_register"
 SERVICE_WRITE_REGISTER_SCHEMA = vol.Schema({
@@ -61,6 +64,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryNotReady(f"Cannot connect to {host}:{port}")
 
     coordinator = AlphaESSCoordinator(hass, entry, client)
+    await coordinator.async_load_restored_dispatch_key()
     await coordinator.async_config_entry_first_refresh()
 
     raw_sn = (coordinator.data.get("inverter_sn") or "").strip().rstrip("\x00").strip()
@@ -68,6 +72,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _serial = raw_sn or None
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+
+    async def _async_reset_on_stop(event: object) -> None:
+        """Send a dispatch-reset to the inverter when HA shuts down.
+
+        This ensures no active Force Export / Import / Charging dispatch is left
+        running on the inverter after HA goes offline.  The handler is registered
+        early so it fires even if the config entry is never unloaded (e.g. a
+        hard shutdown where async_unload_entry is not awaited).
+        """
+        if coordinator.active_dispatch_key is not None:
+            try:
+                await coordinator.async_reset_dispatch()
+                await coordinator.async_set_active_dispatch_key(None)
+                _LOGGER.info(
+                    "AlphaESS Modbus: dispatch reset sent on HA shutdown"
+                )
+            except Exception:
+                _LOGGER.warning(
+                    "AlphaESS Modbus: could not reset dispatch on HA shutdown",
+                    exc_info=True,
+                )
+
+    entry.async_on_unload(
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _async_reset_on_stop)
+    )
 
     if not hass.services.has_service(DOMAIN, SERVICE_WRITE_REGISTER):
         async def _handle_write_register(call: ServiceCall) -> None:
@@ -110,6 +139,21 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unloaded:
         coordinator: AlphaESSCoordinator = hass.data[DOMAIN].pop(entry.entry_id)
         hass.data[DOMAIN].pop(f"{entry.entry_id}_switches", None)
+        # Reset any active dispatch before closing the Modbus connection so the
+        # inverter does not keep running a force-export/import/charging command
+        # after HA goes offline or the integration is reloaded.
+        if coordinator.active_dispatch_key is not None:
+            try:
+                await coordinator.async_reset_dispatch()
+                await coordinator.async_set_active_dispatch_key(None)
+                _LOGGER.info(
+                    "AlphaESS Modbus: dispatch reset sent on entry unload"
+                )
+            except Exception:
+                _LOGGER.warning(
+                    "AlphaESS Modbus: could not reset dispatch on unload",
+                    exc_info=True,
+                )
         await coordinator.client.close()
         if not any(isinstance(o, AlphaESSCoordinator) for o in hass.data[DOMAIN].values()):
             hass.services.async_remove(DOMAIN, SERVICE_WRITE_REGISTER)
