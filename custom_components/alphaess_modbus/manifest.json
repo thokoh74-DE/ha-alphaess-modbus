@@ -1,14 +1,12 @@
 {
   "domain": "alphaess_modbus",
   "name": "AlphaESS Modbus TCP",
-  "codeowners": [
-    "@senalse"
-  ],
+  "codeowners": ["@thokoh74-DE"],
   "config_flow": true,
-  "documentation": "https://github.com/senalse/ha-alphaess-modbus",
+  "documentation": "https://github.com/thokoh74-DE/ha-alphaess-modbus",
   "integration_type": "device",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/senalse/ha-alphaess-modbus/issues",
+  "issue_tracker": "https://github.com/thokoh74-DE/ha-alphaess-modbus/issues",
   "requirements": [
     "pymodbus>=3.7.4"
   ],
